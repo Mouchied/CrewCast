@@ -1,0 +1,25 @@
+node_modules/
+.expo/
+dist/
+web-build/
+
+# Environment variables — NEVER commit these
+.env
+.env.local
+.env.production
+
+# Native
+ios/
+android/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# macOS
+.DS_Store
+
+# TypeScript
+*.tsbuildinfo

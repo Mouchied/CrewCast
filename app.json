@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "CrewCast",
+    "slug": "crewcast",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f172a"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.crewcast.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "CrewCast uses your location to capture job site data for accurate productivity benchmarks."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0f172a"
+      },
+      "package": "com.crewcast.app",
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "CrewCast uses your location to capture job site data for accurate productivity benchmarks."
+        }
+      ]
+    ],
+    "scheme": "crewcast",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
