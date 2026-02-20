@@ -20,6 +20,8 @@ export default function NewJobScreen() {
   const [selectedTaskType, setSelectedTaskType] = useState<TaskType | null>(null);
   const [totalUnits, setTotalUnits] = useState('');
   const [crewSize, setCrewSize] = useState('');
+  const [bidHours, setBidHours] = useState('');
+  const [bidCrewSize, setBidCrewSize] = useState('');
   const [startDate, setStartDate] = useState(
     new Date().toISOString().split('T')[0]
   );
@@ -113,6 +115,8 @@ export default function NewJobScreen() {
       start_date: startDate,
       target_end_date: targetEndDate || null,
       crew_size: crewSize ? Number(crewSize) : null,
+      bid_hours: bidHours ? Number(bidHours) : null,
+      bid_crew_size: bidCrewSize ? Number(bidCrewSize) : null,
       location_name: locationName || null,
       city: city || null,
       state: state || null,
@@ -226,6 +230,31 @@ export default function NewJobScreen() {
           style={styles.input}
           value={crewSize}
           onChangeText={setCrewSize}
+          placeholder="e.g. 4"
+          placeholderTextColor={Colors.textMuted}
+          keyboardType="numeric"
+        />
+
+        <Text style={styles.sectionLabel}>BID / LABOR BUDGET</Text>
+        <Text style={styles.hint}>
+          Enter what you bid so CrewCast can track earned value and tell you if you're over or under budget.
+        </Text>
+
+        <Text style={styles.label}>Bid man-hours (total)</Text>
+        <TextInput
+          style={styles.input}
+          value={bidHours}
+          onChangeText={setBidHours}
+          placeholder="e.g. 320  (4 crew × 10 days × 8 hrs)"
+          placeholderTextColor={Colors.textMuted}
+          keyboardType="numeric"
+        />
+
+        <Text style={styles.label}>Bid crew size assumed</Text>
+        <TextInput
+          style={styles.input}
+          value={bidCrewSize}
+          onChangeText={setBidCrewSize}
           placeholder="e.g. 4"
           placeholderTextColor={Colors.textMuted}
           keyboardType="numeric"

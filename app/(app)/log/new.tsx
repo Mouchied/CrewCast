@@ -7,7 +7,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Location from 'expo-location';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../hooks/useAuth';
-import { Job, WeatherData } from '../../../types';
+import { Job, Task, WeatherData } from '../../../types';
 import { Colors } from '../../../constants/Colors';
 import { fetchWeather } from '../../../lib/weather';
 
@@ -17,6 +17,9 @@ export default function NewLogScreen() {
   const { profile } = useAuth();
 
   const [job, setJob] = useState<Job | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [percentComplete, setPercentComplete] = useState('');
   const [unitsCompleted, setUnitsCompleted] = useState('');
   const [crewSize, setCrewSize] = useState('');
   const [hoursWorked, setHoursWorked] = useState('');
@@ -34,15 +37,24 @@ export default function NewLogScreen() {
   }, [jobId]);
 
   async function fetchJob() {
-    const { data } = await supabase
-      .from('jobs')
-      .select('*, task_types(*), job_snapshots(*)')
-      .eq('id', jobId)
-      .single();
-    if (data) {
-      setJob(data);
-      if (data.crew_size) setCrewSize(String(data.crew_size));
+    const [{ data: jobData }, { data: taskData }] = await Promise.all([
+      supabase
+        .from('jobs')
+        .select('*, task_types(*), job_snapshots(*)')
+        .eq('id', jobId)
+        .single(),
+      supabase
+        .from('tasks')
+        .select('*')
+        .eq('job_id', jobId)
+        .neq('status', 'completed')
+        .order('sequence_order'),
+    ]);
+    if (jobData) {
+      setJob(jobData);
+      if (jobData.crew_size) setCrewSize(String(jobData.crew_size));
     }
+    if (taskData) setTasks(taskData);
   }
 
   async function autoCapture() {
@@ -77,6 +89,8 @@ export default function NewLogScreen() {
       logged_by: profile?.id,
       log_date: logDate,
       units_completed: Number(unitsCompleted),
+      task_id: selectedTaskId ?? null,
+      percent_complete: percentComplete ? Number(percentComplete) : null,
       crew_size: crewSize ? Number(crewSize) : null,
       hours_worked: hoursWorked ? Number(hoursWorked) : null,
       weather_temp_f: weather?.temp_f ?? null,
@@ -169,6 +183,32 @@ export default function NewLogScreen() {
 
         <Text style={styles.sectionLabel}>LOG ENTRY</Text>
 
+        {/* Task selection — optional, only shown if job has tasks */}
+        {tasks.length > 0 && (
+          <>
+            <Text style={styles.label}>Task worked on today</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {[{ id: null, name: 'General / whole job' } as any, ...tasks].map(t => (
+                <TouchableOpacity
+                  key={t.id ?? 'general'}
+                  style={[
+                    styles.taskChip,
+                    selectedTaskId === t.id && styles.taskChipSelected,
+                  ]}
+                  onPress={() => setSelectedTaskId(t.id)}
+                >
+                  <Text style={[
+                    styles.taskChipText,
+                    selectedTaskId === t.id && styles.taskChipTextSelected,
+                  ]}>
+                    {t.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </>
+        )}
+
         <Text style={styles.label}>Date *</Text>
         <TextInput
           style={styles.input}
@@ -212,6 +252,16 @@ export default function NewLogScreen() {
           value={hoursWorked}
           onChangeText={setHoursWorked}
           placeholder="e.g. 32  (4 crew × 8 hrs)"
+          placeholderTextColor={Colors.textMuted}
+          keyboardType="numeric"
+        />
+
+        <Text style={styles.label}>Foreman's % complete estimate (optional)</Text>
+        <TextInput
+          style={styles.input}
+          value={percentComplete}
+          onChangeText={setPercentComplete}
+          placeholder="e.g. 40  (your gut feel on how far along this task is)"
           placeholderTextColor={Colors.textMuted}
           keyboardType="numeric"
         />
@@ -290,6 +340,14 @@ const styles = StyleSheet.create({
   retryText: { color: Colors.primary, fontWeight: '600' },
   weatherGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   coordsText: { fontSize: 11, color: Colors.textMuted },
+  taskChip: {
+    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
+    backgroundColor: Colors.bgCard, borderWidth: 1, borderColor: Colors.border,
+    marginRight: 8,
+  },
+  taskChipSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  taskChipText: { color: Colors.textSecondary, fontWeight: '600', fontSize: 13 },
+  taskChipTextSelected: { color: '#fff' },
 
   sectionLabel: {
     color: Colors.textMuted, fontSize: 11, fontWeight: '700',

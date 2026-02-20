@@ -1,5 +1,10 @@
 import { Tabs } from 'expo-router';
+import { Text } from 'react-native';
 import { Colors } from '../../constants/Colors';
+
+function TabIcon({ icon, color }: { icon: string; color: string }) {
+  return <Text style={{ fontSize: 19, color }}>{icon}</Text>;
+}
 
 export default function AppLayout() {
   return (
@@ -23,48 +28,34 @@ export default function AppLayout() {
         name="index"
         options={{
           title: 'Dashboard',
-          tabBarIcon: ({ color }) => (
-            <TabIcon name="grid" color={color} />
-          ),
+          tabBarIcon: ({ color }) => <TabIcon icon="▦" color={color} />,
         }}
       />
       <Tabs.Screen
         name="jobs/index"
         options={{
           title: 'Jobs',
-          tabBarIcon: ({ color }) => (
-            <TabIcon name="briefcase" color={color} />
-          ),
+          tabBarIcon: ({ color }) => <TabIcon icon="⬡" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="jobs/new"
+        name="benchmarks"
         options={{
-          title: 'New Job',
-          tabBarIcon: ({ color }) => (
-            <TabIcon name="plus-circle" color={color} />
-          ),
+          title: 'Benchmarks',
+          tabBarIcon: ({ color }) => <TabIcon icon="◈" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="jobs/[id]"
-        options={{ href: null }}
+        name="settings"
+        options={{
+          title: 'Settings',
+          tabBarIcon: ({ color }) => <TabIcon icon="⚙" color={color} />,
+        }}
       />
-      <Tabs.Screen
-        name="log/new"
-        options={{ href: null }}
-      />
+      {/* Hidden screens — navigated to via router.push */}
+      <Tabs.Screen name="jobs/new"  options={{ href: null }} />
+      <Tabs.Screen name="jobs/[id]" options={{ href: null }} />
+      <Tabs.Screen name="log/new"   options={{ href: null }} />
     </Tabs>
   );
-}
-
-// Inline icon component using unicode characters (no native dependency)
-function TabIcon({ name, color }: { name: string; color: string }) {
-  const icons: Record<string, string> = {
-    grid: '⊞',
-    briefcase: '💼',
-    'plus-circle': '＋',
-  };
-  const { Text } = require('react-native');
-  return <Text style={{ fontSize: 20, color }}>{icons[name] ?? '•'}</Text>;
 }
