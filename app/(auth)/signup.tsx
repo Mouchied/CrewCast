@@ -28,40 +28,37 @@ export default function SignupScreen() {
 
     setLoading(true);
 
-    // 1. Create auth user
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    // Single call — the handle_new_user() DB trigger atomically creates
+    // the company and profile from the metadata we pass here.
+    // No separate company insert or profile.update needed.
+    const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: {
+        data: {
+          full_name:    fullName,
+          company_name: companyName,
+          industry:     industry || null,
+        },
+      },
     });
 
-    if (authError || !authData.user) {
-      setLoading(false);
-      Alert.alert('Signup failed', authError?.message ?? 'Unknown error');
-      return;
-    }
-
-    // 2. Create company
-    const { data: company, error: companyError } = await supabase
-      .from('companies')
-      .insert({ name: companyName, industry: industry || null })
-      .select()
-      .single();
-
-    if (companyError || !company) {
-      setLoading(false);
-      Alert.alert('Error', 'Failed to create company. Please try again.');
-      return;
-    }
-
-    // 3. Link profile to company
-    await supabase
-      .from('profiles')
-      .update({ company_id: company.id, full_name: fullName })
-      .eq('id', authData.user.id);
-
     setLoading(false);
-    router.replace('/(app)');
+
+    if (error) {
+      Alert.alert('Signup failed', error.message);
+      return;
+    }
+
+    // Supabase may require email confirmation depending on project settings.
+    // If email confirmation is enabled the user has no session yet — show a
+    // message instead of navigating. If disabled, the auth listener in
+    // useAuth will fire and the AuthGate will redirect automatically.
+    Alert.alert(
+      'Account created',
+      'Check your email to confirm your address, then sign in.',
+      [{ text: 'OK', onPress: () => router.replace('/(auth)/login') }]
+    );
   }
 
   return (
