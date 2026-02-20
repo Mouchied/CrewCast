@@ -83,6 +83,7 @@ export interface Job {
   task_types?: TaskType;
   job_snapshots?: JobSnapshot;
   tasks?: Task[];
+  job_variables?: JobVariable[];
 }
 
 export interface DailyLog {
@@ -106,6 +107,7 @@ export interface DailyLog {
   created_at: string;
   // joined
   tasks?: Pick<Task, 'id' | 'name'>;
+  log_variable_overrides?: LogVariableOverride[];
 }
 
 export interface JobSnapshot {
@@ -167,6 +169,64 @@ export interface CompanyBenchmark {
   avg_temp_f?: number;
   state?: string;
   climate_zone?: string;
+}
+
+/** A variable type in the catalog (global or company-specific) */
+export interface JobVariableType {
+  id: string;
+  name: string;
+  description?: string;
+  category?: string;       // matches task_types.category; null = all trades
+  unit_hint?: string;      // shown next to the value input, e.g. "AWG", "inches"
+  common_values: string[]; // autocomplete suggestions
+  is_global: boolean;
+  company_id?: string;
+  created_by?: string;
+  created_at: string;
+}
+
+/** A variable value assigned to a specific job */
+export interface JobVariable {
+  id: string;
+  job_id: string;
+  variable_type_id: string;
+  value: string;
+  created_at: string;
+  updated_at: string;
+  // joined
+  job_variable_types?: JobVariableType;
+}
+
+/** A per-log override when conditions change mid-job */
+export interface LogVariableOverride {
+  id: string;
+  daily_log_id: string;
+  variable_type_id: string;
+  value: string;
+  created_at: string;
+  // joined
+  job_variable_types?: JobVariableType;
+}
+
+/** Variable-grouped productivity benchmark (from variable_productivity_benchmarks view) */
+export interface VariableProductivityBenchmark {
+  company_id: string;
+  trade_category?: string;
+  task_type_name?: string;
+  work_unit?: string;
+  variable_name: string;
+  variable_value: string;
+  variable_unit?: string;
+  job_count: number;
+  total_log_days: number;
+  avg_units_per_day: number;
+  min_units_per_day: number;
+  max_units_per_day: number;
+  stddev_units_per_day?: number;
+  avg_burn_rate?: number;
+  avg_crew_size?: number;
+  avg_temp_f?: number;
+  state?: string;
 }
 
 export interface WeatherData {

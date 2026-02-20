@@ -4,12 +4,13 @@ import {
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import { CompanyBenchmark } from '../../types';
+import { CompanyBenchmark, VariableProductivityBenchmark } from '../../types';
 import { Colors } from '../../constants/Colors';
 
 export default function BenchmarksScreen() {
   const { profile } = useAuth();
   const [benchmarks, setBenchmarks] = useState<CompanyBenchmark[]>([]);
+  const [varBenchmarks, setVarBenchmarks] = useState<VariableProductivityBenchmark[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -19,7 +20,7 @@ export default function BenchmarksScreen() {
   async function fetchData() {
     if (!profile?.company_id) return;
 
-    const [{ data: bmData }, { data: jobData }] = await Promise.all([
+    const [{ data: bmData }, { data: jobData }, { data: varBmData }] = await Promise.all([
       supabase
         .from('company_benchmarks')
         .select('*')
@@ -33,10 +34,16 @@ export default function BenchmarksScreen() {
         `)
         .eq('company_id', profile.company_id)
         .order('created_at', { ascending: false }),
+      supabase
+        .from('variable_productivity_benchmarks')
+        .select('*')
+        .eq('company_id', profile.company_id)
+        .gte('job_count', 2),   // only show variables with 2+ jobs for meaningful comparison
     ]);
 
     setBenchmarks(bmData ?? []);
     setJobs(jobData ?? []);
+    setVarBenchmarks(varBmData ?? []);
     setLoading(false);
     setRefreshing(false);
   }
@@ -144,6 +151,18 @@ export default function BenchmarksScreen() {
                 {benchmarks.map(bm => (
                   <BenchmarkRow key={`${bm.task_type_id}-${bm.state}`} bm={bm} />
                 ))}
+              </View>
+            )}
+
+            {/* ── VARIABLE PRODUCTIVITY INSIGHTS ── */}
+            {varBenchmarks.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>By Job Variable</Text>
+                <Text style={styles.sectionHint}>
+                  How does productivity change based on specific conditions?
+                  These insights only appear when you have 2+ jobs with the same variable.
+                </Text>
+                <VarInsightList items={varBenchmarks} />
               </View>
             )}
 
@@ -275,6 +294,124 @@ const jpStyles = StyleSheet.create({
   pace: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary },
   unit: { fontSize: 10, color: Colors.textMuted },
   days: { fontSize: 11, color: Colors.textMuted },
+});
+
+// ── Variable Productivity Insights ───────────────────────────
+
+function VarInsightList({ items }: { items: VariableProductivityBenchmark[] }) {
+  // Group by variable_name so we can show comparisons within each variable
+  const grouped = items.reduce<Record<string, VariableProductivityBenchmark[]>>(
+    (acc, item) => {
+      const key = `${item.variable_name}||${item.trade_category ?? 'all'}`;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(item);
+      return acc;
+    },
+    {}
+  );
+
+  return (
+    <View style={viStyles.container}>
+      {Object.entries(grouped).map(([key, rows]) => {
+        const sorted = [...rows].sort(
+          (a, b) => b.avg_units_per_day - a.avg_units_per_day
+        );
+        const best = sorted[0];
+        const worst = sorted[sorted.length - 1];
+        const variableName = rows[0].variable_name;
+        const category = rows[0].trade_category;
+        const unit = rows[0].work_unit ?? 'units';
+
+        return (
+          <View key={key} style={viStyles.group}>
+            <View style={viStyles.groupHeader}>
+              <Text style={viStyles.varName}>{variableName}</Text>
+              {category && (
+                <Text style={viStyles.category}>{category}</Text>
+              )}
+            </View>
+
+            {sorted.map((item) => {
+              const isBest = item.variable_value === best.variable_value;
+              const isWorst =
+                item.variable_value === worst.variable_value &&
+                sorted.length > 1;
+              return (
+                <View key={item.variable_value} style={viStyles.row}>
+                  <View style={viStyles.rowLeft}>
+                    <Text style={viStyles.value}>
+                      {item.variable_value}
+                      {item.variable_unit ? ` ${item.variable_unit}` : ''}
+                    </Text>
+                    <Text style={viStyles.meta}>
+                      {item.job_count} job{item.job_count !== 1 ? 's' : ''}
+                      {item.avg_crew_size
+                        ? ` · ${item.avg_crew_size.toFixed(1)} crew avg`
+                        : ''}
+                      {item.state ? ` · ${item.state}` : ''}
+                    </Text>
+                  </View>
+                  <View style={viStyles.rowRight}>
+                    <Text
+                      style={[
+                        viStyles.pace,
+                        isBest && { color: Colors.success },
+                        isWorst && { color: Colors.danger },
+                      ]}
+                    >
+                      {item.avg_units_per_day.toFixed(1)}
+                    </Text>
+                    <Text style={viStyles.paceUnit}>{unit}/day</Text>
+                  </View>
+                </View>
+              );
+            })}
+
+            {sorted.length > 1 && (
+              <Text style={viStyles.insight}>
+                {best.variable_value} is{' '}
+                {(
+                  ((best.avg_units_per_day - worst.avg_units_per_day) /
+                    worst.avg_units_per_day) *
+                  100
+                ).toFixed(0)}
+                % faster than {worst.variable_value}
+              </Text>
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+const viStyles = StyleSheet.create({
+  container: { gap: 16 },
+  group: {
+    backgroundColor: Colors.bgCard, borderRadius: 14,
+    padding: 14, gap: 8, borderWidth: 1, borderColor: Colors.border,
+  },
+  groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  varName: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
+  category: {
+    fontSize: 10, fontWeight: '700', color: Colors.primary,
+    backgroundColor: Colors.primary + '22', paddingHorizontal: 6,
+    paddingVertical: 2, borderRadius: 4, textTransform: 'uppercase', letterSpacing: 0.6,
+  },
+  row: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  rowLeft: { flex: 1 },
+  value: { fontSize: 14, color: Colors.textPrimary, fontWeight: '600' },
+  meta: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
+  rowRight: { alignItems: 'flex-end' },
+  pace: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary },
+  paceUnit: { fontSize: 10, color: Colors.textMuted },
+  insight: {
+    fontSize: 12, color: Colors.success, fontWeight: '600',
+    fontStyle: 'italic', marginTop: 4,
+  },
 });
 
 const styles = StyleSheet.create({

@@ -5,8 +5,9 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
-import { Job, DailyLog, Task, getPaceColor, getForecastSentence } from '../../../types';
+import { Job, DailyLog, Task, JobVariable, getPaceColor, getForecastSentence } from '../../../types';
 import { Colors } from '../../../constants/Colors';
+import JobVariables, { jobVariablesToPending } from '../../../components/JobVariables';
 
 export default function JobDetailScreen() {
   const router = useRouter();
@@ -15,6 +16,7 @@ export default function JobDetailScreen() {
   const [job, setJob] = useState<Job | null>(null);
   const [logs, setLogs] = useState<DailyLog[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [jobVars, setJobVars] = useState<JobVariable[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTaskName, setNewTaskName] = useState('');
@@ -23,26 +25,33 @@ export default function JobDetailScreen() {
   useEffect(() => { if (id) fetchData(); }, [id]);
 
   async function fetchData() {
-    const [{ data: jobData }, { data: logData }, { data: taskData }] = await Promise.all([
-      supabase
-        .from('jobs')
-        .select('*, task_types(*), job_snapshots(*)')
-        .eq('id', id)
-        .single(),
-      supabase
-        .from('daily_logs')
-        .select('*, tasks(id, name)')
-        .eq('job_id', id)
-        .order('log_date', { ascending: false }),
-      supabase
-        .from('tasks')
-        .select('*')
-        .eq('job_id', id)
-        .order('sequence_order'),
-    ]);
+    const [{ data: jobData }, { data: logData }, { data: taskData }, { data: varData }] =
+      await Promise.all([
+        supabase
+          .from('jobs')
+          .select('*, task_types(*), job_snapshots(*)')
+          .eq('id', id)
+          .single(),
+        supabase
+          .from('daily_logs')
+          .select('*, tasks(id, name)')
+          .eq('job_id', id)
+          .order('log_date', { ascending: false }),
+        supabase
+          .from('tasks')
+          .select('*')
+          .eq('job_id', id)
+          .order('sequence_order'),
+        supabase
+          .from('job_variables')
+          .select('*, job_variable_types(*)')
+          .eq('job_id', id)
+          .order('created_at'),
+      ]);
     if (jobData) setJob(jobData);
     if (logData) setLogs(logData);
     if (taskData) setTasks(taskData);
+    if (varData) setJobVars(varData);
     setLoading(false);
   }
 
@@ -311,11 +320,14 @@ export default function JobDetailScreen() {
           )}
         </View>
 
-        {/* Equipment notes */}
-        {job.equipment_notes && (
+        {/* ── JOB VARIABLES ── */}
+        {jobVars.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Equipment & Materials</Text>
-            <Text style={styles.mutedText}>{job.equipment_notes}</Text>
+            <Text style={styles.sectionTitle}>Job Variables</Text>
+            <JobVariables
+              readOnly
+              variables={jobVariablesToPending(jobVars)}
+            />
           </View>
         )}
 

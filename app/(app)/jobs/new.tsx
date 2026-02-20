@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, ActivityIndicator, Platform,
+  ScrollView, Alert, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
@@ -10,6 +10,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { TaskType } from '../../../types';
 import { Colors } from '../../../constants/Colors';
 import { reverseGeocode } from '../../../lib/weather';
+import JobVariables, { PendingVariable } from '../../../components/JobVariables';
 
 export default function NewJobScreen() {
   const router = useRouter();
@@ -26,7 +27,7 @@ export default function NewJobScreen() {
     new Date().toISOString().split('T')[0]
   );
   const [targetEndDate, setTargetEndDate] = useState('');
-  const [equipmentNotes, setEquipmentNotes] = useState('');
+  const [jobVariables, setJobVariables] = useState<PendingVariable[]>([]);
   const [notes, setNotes] = useState('');
   const [locationName, setLocationName] = useState('');
   const [city, setCity] = useState('');
@@ -66,7 +67,7 @@ export default function NewJobScreen() {
       if (geo.city) setCity(geo.city);
       if (geo.state) setState(geo.state);
       if (geo.locationName) setLocationName(geo.locationName);
-    } catch (e) {
+    } catch {
       Alert.alert('Error', 'Could not get location. You can enter it manually.');
     }
     setLocating(false);
@@ -105,29 +106,54 @@ export default function NewJobScreen() {
       unit = newTask.unit;
     }
 
-    const { error } = await supabase.from('jobs').insert({
-      company_id: profile?.company_id,
-      created_by: profile?.id,
-      name: name.trim(),
-      task_type_id: taskTypeId,
-      total_units: Number(totalUnits),
-      unit,
-      start_date: startDate,
-      target_end_date: targetEndDate || null,
-      crew_size: crewSize ? Number(crewSize) : null,
-      bid_hours: bidHours ? Number(bidHours) : null,
-      bid_crew_size: bidCrewSize ? Number(bidCrewSize) : null,
-      location_name: locationName || null,
-      city: city || null,
-      state: state || null,
-      latitude: latitude ?? null,
-      longitude: longitude ?? null,
-      equipment_notes: equipmentNotes || null,
-      notes: notes || null,
-    });
+    // Create the job
+    const { data: newJob, error } = await supabase
+      .from('jobs')
+      .insert({
+        company_id: profile?.company_id,
+        created_by: profile?.id,
+        name: name.trim(),
+        task_type_id: taskTypeId,
+        total_units: Number(totalUnits),
+        unit,
+        start_date: startDate,
+        target_end_date: targetEndDate || null,
+        crew_size: crewSize ? Number(crewSize) : null,
+        bid_hours: bidHours ? Number(bidHours) : null,
+        bid_crew_size: bidCrewSize ? Number(bidCrewSize) : null,
+        location_name: locationName || null,
+        city: city || null,
+        state: state || null,
+        latitude: latitude ?? null,
+        longitude: longitude ?? null,
+        notes: notes || null,
+      })
+      .select()
+      .single();
+
+    if (error || !newJob) {
+      Alert.alert('Error', error?.message ?? 'Failed to create job.');
+      setSubmitting(false);
+      return;
+    }
+
+    // Save job variables if any were added
+    if (jobVariables.length > 0) {
+      const rows = jobVariables.map((v) => ({
+        job_id: newJob.id,
+        variable_type_id: v.variable_type_id,
+        value: v.value,
+      }));
+      const { error: varError } = await supabase
+        .from('job_variables')
+        .insert(rows);
+      if (varError) {
+        // Non-fatal — job was created, just log the variable error
+        console.warn('Failed to save job variables:', varError.message);
+      }
+    }
 
     setSubmitting(false);
-    if (error) { Alert.alert('Error', error.message); return; }
     router.replace('/(app)');
   }
 
@@ -148,7 +174,7 @@ export default function NewJobScreen() {
           style={styles.input}
           value={name}
           onChangeText={setName}
-          placeholder="e.g. Smith Ranch Solar — Phase 2"
+          placeholder="e.g. Midland Ranch Solar — Phase 2"
           placeholderTextColor={Colors.textMuted}
         />
 
@@ -161,7 +187,12 @@ export default function NewJobScreen() {
                 styles.chip,
                 selectedTaskType?.id === t.id && !showCustomTask && styles.chipSelected,
               ]}
-              onPress={() => { setSelectedTaskType(t); setShowCustomTask(false); }}
+              onPress={() => {
+                setSelectedTaskType(t);
+                setShowCustomTask(false);
+                // Clear variables when task type changes (different trade, different catalog)
+                setJobVariables([]);
+              }}
             >
               <Text style={[
                 styles.chipText,
@@ -173,7 +204,7 @@ export default function NewJobScreen() {
           ))}
           <TouchableOpacity
             style={[styles.chip, showCustomTask && styles.chipSelected]}
-            onPress={() => { setShowCustomTask(true); setSelectedTaskType(null); }}
+            onPress={() => { setShowCustomTask(true); setSelectedTaskType(null); setJobVariables([]); }}
           >
             <Text style={[styles.chipText, showCustomTask && styles.chipTextSelected]}>
               + Custom
@@ -209,7 +240,7 @@ export default function NewJobScreen() {
             </Text>
             {selectedTaskType.category && (
               <Text style={styles.infoText}>
-                Category: <Text style={styles.infoValue}>{selectedTaskType.category}</Text>
+                Trade: <Text style={styles.infoValue}>{selectedTaskType.category}</Text>
               </Text>
             )}
           </View>
@@ -235,9 +266,25 @@ export default function NewJobScreen() {
           keyboardType="numeric"
         />
 
+        {/* ── Job Variables ───────────────────────────────── */}
+        <Text style={styles.sectionLabel}>JOB VARIABLES</Text>
+        <Text style={styles.hint}>
+          Track the specific conditions for this job — pipe size, wire gauge,
+          racking type, shingle brand — so CrewCast can compare productivity
+          across the same conditions over time. Works for any trade.
+        </Text>
+
+        <JobVariables
+          tradeCategory={selectedTaskType?.category ?? undefined}
+          variables={jobVariables}
+          onChange={setJobVariables}
+        />
+
+        {/* ── Bid / Labor Budget ──────────────────────────── */}
         <Text style={styles.sectionLabel}>BID / LABOR BUDGET</Text>
         <Text style={styles.hint}>
-          Enter what you bid so CrewCast can track earned value and tell you if you're over or under budget.
+          Enter what you bid so CrewCast can track earned value and tell you
+          if you're over or under budget.
         </Text>
 
         <Text style={styles.label}>Bid man-hours (total)</Text>
@@ -260,6 +307,7 @@ export default function NewJobScreen() {
           keyboardType="numeric"
         />
 
+        {/* ── Dates ───────────────────────────────────────── */}
         <Text style={styles.sectionLabel}>DATES</Text>
 
         <Text style={styles.label}>Start date *</Text>
@@ -280,9 +328,11 @@ export default function NewJobScreen() {
           placeholderTextColor={Colors.textMuted}
         />
 
+        {/* ── Location ────────────────────────────────────── */}
         <Text style={styles.sectionLabel}>LOCATION</Text>
         <Text style={styles.hint}>
-          Location + weather are auto-captured every time you log — critical for future benchmarks.
+          Location + weather are auto-captured every time you log — critical
+          for regional benchmarks.
         </Text>
 
         <TouchableOpacity style={styles.locateBtn} onPress={detectLocation} disabled={locating}>
@@ -307,18 +357,8 @@ export default function NewJobScreen() {
           placeholderTextColor={Colors.textMuted}
         />
 
-        <Text style={styles.sectionLabel}>NOTES & EQUIPMENT</Text>
-
-        <Text style={styles.label}>Equipment / materials notes</Text>
-        <TextInput
-          style={[styles.input, styles.textarea]}
-          value={equipmentNotes}
-          onChangeText={setEquipmentNotes}
-          placeholder="e.g. IronRidge XR100 racking, Silfab 400W panels, 2" EMT conduit…"
-          placeholderTextColor={Colors.textMuted}
-          multiline
-          numberOfLines={3}
-        />
+        {/* ── Notes ───────────────────────────────────────── */}
+        <Text style={styles.sectionLabel}>NOTES</Text>
 
         <Text style={styles.label}>General notes</Text>
         <TextInput
