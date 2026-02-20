@@ -6,7 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import { Company, CompanySubscription, TaskType } from '../../types';
+import { Company, CompanySubscription, TaskType, CrewMember } from '../../types';
 import { Colors } from '../../constants/Colors';
 
 export default function SettingsScreen() {
@@ -17,11 +17,15 @@ export default function SettingsScreen() {
   const [subscription, setSubscription] = useState<CompanySubscription | null>(null);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [customTaskTypes, setCustomTaskTypes] = useState<TaskType[]>([]);
+  const [crewMembers, setCrewMembers] = useState<CrewMember[]>([]);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviting, setInviting] = useState(false);
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskUnit, setNewTaskUnit] = useState('');
   const [addingTask, setAddingTask] = useState(false);
+  const [newCrewName, setNewCrewName] = useState('');
+  const [newCrewTrade, setNewCrewTrade] = useState('');
+  const [addingCrew, setAddingCrew] = useState(false);
 
   useEffect(() => { if (profile?.company_id) fetchData(); }, [profile]);
 
@@ -33,6 +37,7 @@ export default function SettingsScreen() {
       { data: subData },
       { data: teamData },
       { data: taskData },
+      { data: crewData },
     ] = await Promise.all([
       supabase.from('companies').select('*').eq('id', profile.company_id).single(),
       supabase
@@ -51,12 +56,18 @@ export default function SettingsScreen() {
         .eq('is_global', false)
         .eq('created_by', profile.id)
         .order('name'),
+      supabase
+        .from('crew_members')
+        .select('*')
+        .eq('company_id', profile.company_id)
+        .order('name'),
     ]);
 
     if (companyData) setCompany(companyData);
     if (subData) setSubscription(subData as any);
     if (teamData) setTeamMembers(teamData);
     if (taskData) setCustomTaskTypes(taskData);
+    if (crewData) setCrewMembers(crewData);
   }
 
   async function sendInvite() {
@@ -101,6 +112,46 @@ export default function SettingsScreen() {
       setNewTaskUnit('');
       fetchData();
     }
+  }
+
+  async function addCrewMember() {
+    if (!newCrewName.trim() || !profile?.company_id) return;
+    setAddingCrew(true);
+    const { error } = await supabase.from('crew_members').insert({
+      company_id: profile.company_id,
+      name: newCrewName.trim(),
+      trade: newCrewTrade.trim() || null,
+      active: true,
+    });
+    setAddingCrew(false);
+    if (error) {
+      Alert.alert('Error', error.message);
+    } else {
+      setNewCrewName('');
+      setNewCrewTrade('');
+      fetchData();
+    }
+  }
+
+  function deactivateCrew(member: CrewMember) {
+    Alert.alert(
+      `Remove ${member.name}?`,
+      'They will no longer appear in the crew tagger. Their historical log data is preserved.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            await supabase
+              .from('crew_members')
+              .update({ active: false })
+              .eq('id', member.id);
+            fetchData();
+          },
+        },
+      ]
+    );
   }
 
   async function signOut() {
@@ -286,6 +337,68 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* ── CREW MEMBERS ── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            Crew ({crewMembers.filter(c => c.active).length} active)
+          </Text>
+          <Text style={styles.sectionHint}>
+            Add your crew members here. Tag them on daily logs to track per-person
+            productivity over time — wire gauge, task type, location, and more.
+          </Text>
+
+          {crewMembers.filter(c => c.active).length > 0 && (
+            <View style={styles.card}>
+              {crewMembers.filter(c => c.active).map(member => (
+                <View key={member.id} style={styles.crewRow}>
+                  <View style={styles.crewAvatar}>
+                    <Text style={styles.crewAvatarText}>
+                      {member.name.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.crewName}>{member.name}</Text>
+                    {member.trade ? (
+                      <Text style={styles.crewTrade}>{member.trade}</Text>
+                    ) : null}
+                  </View>
+                  <TouchableOpacity
+                    style={styles.crewRemoveBtn}
+                    onPress={() => deactivateCrew(member)}
+                  >
+                    <Text style={styles.crewRemoveText}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Add crew member */}
+          <View style={styles.addTaskCard}>
+            <TextInput
+              style={styles.input}
+              value={newCrewName}
+              onChangeText={setNewCrewName}
+              placeholder="Name (e.g. Bob Smith)"
+              placeholderTextColor={Colors.textMuted}
+            />
+            <TextInput
+              style={styles.input}
+              value={newCrewTrade}
+              onChangeText={setNewCrewTrade}
+              placeholder="Trade / specialty (e.g. electrician, roofer)"
+              placeholderTextColor={Colors.textMuted}
+            />
+            <TouchableOpacity
+              style={[styles.addBtn, addingCrew && { opacity: 0.6 }]}
+              onPress={addCrewMember}
+              disabled={addingCrew}
+            >
+              <Text style={styles.addBtnText}>+ Add Crew Member</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* ── ACCOUNT ── */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
@@ -410,6 +523,20 @@ const styles = StyleSheet.create({
   addBtnText: { color: '#fff', fontWeight: '700' },
 
   emptyText: { color: Colors.textMuted, fontSize: 13 },
+
+  crewRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  crewAvatar: {
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: Colors.primary + '33', alignItems: 'center', justifyContent: 'center',
+  },
+  crewAvatarText: { fontSize: 16, fontWeight: '800', color: Colors.primary },
+  crewName: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
+  crewTrade: { fontSize: 12, color: Colors.textMuted, marginTop: 1 },
+  crewRemoveBtn: { paddingHorizontal: 10, paddingVertical: 6 },
+  crewRemoveText: { color: Colors.danger, fontSize: 12, fontWeight: '600' },
 
   signOutBtn: {
     borderWidth: 1, borderColor: Colors.danger + '66',

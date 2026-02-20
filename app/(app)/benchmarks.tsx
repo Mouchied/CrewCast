@@ -5,12 +5,27 @@ import {
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { CompanyBenchmark, VariableProductivityBenchmark } from '../../types';
+
+// Minimal shape from crew_member_benchmarks view
+interface CrewMemberBenchmark {
+  crew_member_id: string;
+  crew_member_name: string;
+  trade?: string;
+  task_type_name: string;
+  work_unit: string;
+  total_log_days: number;
+  total_jobs: number;
+  avg_units_per_person_day: number;
+  total_units_attributed: number;
+  last_active?: string;
+}
 import { Colors } from '../../constants/Colors';
 
 export default function BenchmarksScreen() {
   const { profile } = useAuth();
   const [benchmarks, setBenchmarks] = useState<CompanyBenchmark[]>([]);
   const [varBenchmarks, setVarBenchmarks] = useState<VariableProductivityBenchmark[]>([]);
+  const [crewBenchmarks, setCrewBenchmarks] = useState<CrewMemberBenchmark[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -20,30 +35,37 @@ export default function BenchmarksScreen() {
   async function fetchData() {
     if (!profile?.company_id) return;
 
-    const [{ data: bmData }, { data: jobData }, { data: varBmData }] = await Promise.all([
-      supabase
-        .from('company_benchmarks')
-        .select('*')
-        .eq('company_id', profile.company_id),
-      supabase
-        .from('jobs')
-        .select(`
-          id, name, unit, total_units, status, location_name, state,
-          task_types(name),
-          job_snapshots(avg_units_per_day, last_7_day_avg, burn_rate, pace_status, total_days_logged)
-        `)
-        .eq('company_id', profile.company_id)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('variable_productivity_benchmarks')
-        .select('*')
-        .eq('company_id', profile.company_id)
-        .gte('job_count', 2),   // only show variables with 2+ jobs for meaningful comparison
-    ]);
+    const [{ data: bmData }, { data: jobData }, { data: varBmData }, { data: crewBmData }] =
+      await Promise.all([
+        supabase
+          .from('company_benchmarks')
+          .select('*')
+          .eq('company_id', profile.company_id),
+        supabase
+          .from('jobs')
+          .select(`
+            id, name, unit, total_units, status, location_name, state,
+            task_types(name),
+            job_snapshots(avg_units_per_day, last_7_day_avg, burn_rate, pace_status, total_days_logged)
+          `)
+          .eq('company_id', profile.company_id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('variable_productivity_benchmarks')
+          .select('*')
+          .eq('company_id', profile.company_id)
+          .gte('job_count', 2),
+        supabase
+          .from('crew_member_benchmarks')
+          .select('*')
+          .eq('company_id', profile.company_id)
+          .order('avg_units_per_person_day', { ascending: false }),
+      ]);
 
     setBenchmarks(bmData ?? []);
     setJobs(jobData ?? []);
     setVarBenchmarks(varBmData ?? []);
+    setCrewBenchmarks(crewBmData ?? []);
     setLoading(false);
     setRefreshing(false);
   }
@@ -180,6 +202,18 @@ export default function BenchmarksScreen() {
               )}
             </View>
 
+            {/* ── CREW PERFORMANCE ── */}
+            {crewBenchmarks.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Crew Performance</Text>
+                <Text style={styles.sectionHint}>
+                  Per-person productivity by task type. Equal-split attribution
+                  across crew — tag crew members on daily logs to build this data.
+                </Text>
+                <CrewLeaderboard rows={crewBenchmarks} />
+              </View>
+            )}
+
             {/* ── DATA MOAT CALLOUT ── */}
             <View style={styles.moatCard}>
               <Text style={styles.moatTitle}>Your data is your edge.</Text>
@@ -294,6 +328,86 @@ const jpStyles = StyleSheet.create({
   pace: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary },
   unit: { fontSize: 10, color: Colors.textMuted },
   days: { fontSize: 11, color: Colors.textMuted },
+});
+
+// ── Crew Leaderboard ─────────────────────────────────────────
+
+function CrewLeaderboard({ rows }: { rows: CrewMemberBenchmark[] }) {
+  // Group by crew member → show their tasks sorted by productivity
+  const byMember: Record<string, CrewMemberBenchmark[]> = {};
+  rows.forEach(r => {
+    if (!byMember[r.crew_member_id]) byMember[r.crew_member_id] = [];
+    byMember[r.crew_member_id].push(r);
+  });
+
+  // Sort members by their highest avg across all tasks
+  const sorted = Object.values(byMember).sort(
+    (a, b) =>
+      Math.max(...b.map(r => r.avg_units_per_person_day)) -
+      Math.max(...a.map(r => r.avg_units_per_person_day))
+  );
+
+  return (
+    <View style={clStyles.container}>
+      {sorted.map(memberRows => {
+        const name = memberRows[0].crew_member_name;
+        const trade = memberRows[0].trade;
+        const totalDays = memberRows.reduce((s, r) => s + r.total_log_days, 0);
+        return (
+          <View key={memberRows[0].crew_member_id} style={clStyles.card}>
+            <View style={clStyles.cardHeader}>
+              <View style={clStyles.avatar}>
+                <Text style={clStyles.avatarText}>{name.charAt(0).toUpperCase()}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={clStyles.name}>{name}</Text>
+                <Text style={clStyles.meta}>
+                  {trade ? `${trade} · ` : ''}{totalDays} day{totalDays !== 1 ? 's' : ''} logged
+                </Text>
+              </View>
+            </View>
+            {memberRows.map(r => (
+              <View key={r.task_type_name} style={clStyles.taskRow}>
+                <Text style={clStyles.taskName}>{r.task_type_name}</Text>
+                <View style={clStyles.taskRight}>
+                  <Text style={clStyles.taskPace}>
+                    {r.avg_units_per_person_day.toFixed(1)}
+                  </Text>
+                  <Text style={clStyles.taskUnit}>
+                    {r.work_unit}/person/day
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+const clStyles = StyleSheet.create({
+  container: { gap: 12 },
+  card: {
+    backgroundColor: Colors.bgCard, borderRadius: 14,
+    padding: 14, gap: 10, borderWidth: 1, borderColor: Colors.border,
+  },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  avatar: {
+    width: 42, height: 42, borderRadius: 21,
+    backgroundColor: Colors.primary + '33', alignItems: 'center', justifyContent: 'center',
+  },
+  avatarText: { fontSize: 18, fontWeight: '800', color: Colors.primary },
+  name: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
+  meta: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  taskRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: 8, borderTopWidth: 1, borderTopColor: Colors.border,
+  },
+  taskName: { fontSize: 13, color: Colors.textSecondary, flex: 1 },
+  taskRight: { alignItems: 'flex-end' },
+  taskPace: { fontSize: 18, fontWeight: '800', color: Colors.primary },
+  taskUnit: { fontSize: 10, color: Colors.textMuted },
 });
 
 // ── Variable Productivity Insights ───────────────────────────

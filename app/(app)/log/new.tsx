@@ -7,9 +7,10 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Location from 'expo-location';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../hooks/useAuth';
-import { Job, Task, WeatherData } from '../../../types';
+import { Job, Task, WeatherData, CrewMember } from '../../../types';
 import { Colors } from '../../../constants/Colors';
 import { fetchWeather } from '../../../lib/weather';
+import JobVariables, { PendingVariable, jobVariablesToPending } from '../../../components/JobVariables';
 
 export default function NewLogScreen() {
   const router = useRouter();
@@ -18,13 +19,17 @@ export default function NewLogScreen() {
 
   const [job, setJob] = useState<Job | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [crewMembers, setCrewMembers] = useState<CrewMember[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectedCrewIds, setSelectedCrewIds] = useState<Set<string>>(new Set());
   const [percentComplete, setPercentComplete] = useState('');
   const [unitsCompleted, setUnitsCompleted] = useState('');
   const [crewSize, setCrewSize] = useState('');
   const [hoursWorked, setHoursWorked] = useState('');
   const [logDate, setLogDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
+  // Variables for this log — starts pre-populated from job defaults
+  const [logVariables, setLogVariables] = useState<PendingVariable[]>([]);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
@@ -37,24 +42,40 @@ export default function NewLogScreen() {
   }, [jobId]);
 
   async function fetchJob() {
-    const [{ data: jobData }, { data: taskData }] = await Promise.all([
-      supabase
-        .from('jobs')
-        .select('*, task_types(*), job_snapshots(*)')
-        .eq('id', jobId)
-        .single(),
-      supabase
-        .from('tasks')
-        .select('*')
-        .eq('job_id', jobId)
-        .neq('status', 'completed')
-        .order('sequence_order'),
-    ]);
+    const [{ data: jobData }, { data: taskData }, { data: varData }, { data: memberData }] =
+      await Promise.all([
+        supabase
+          .from('jobs')
+          .select('*, task_types(*), job_snapshots(*)')
+          .eq('id', jobId)
+          .single(),
+        supabase
+          .from('tasks')
+          .select('*')
+          .eq('job_id', jobId)
+          .neq('status', 'completed')
+          .order('sequence_order'),
+        supabase
+          .from('job_variables')
+          .select('*, job_variable_types(*)')
+          .eq('job_id', jobId)
+          .order('created_at'),
+        supabase
+          .from('crew_members')
+          .select('*')
+          .eq('company_id', profile?.company_id)
+          .eq('active', true)
+          .order('name'),
+      ]);
+
     if (jobData) {
       setJob(jobData);
       if (jobData.crew_size) setCrewSize(String(jobData.crew_size));
     }
     if (taskData) setTasks(taskData);
+    // Pre-populate log variables from job defaults
+    if (varData) setLogVariables(jobVariablesToPending(varData));
+    if (memberData) setCrewMembers(memberData);
   }
 
   async function autoCapture() {
@@ -76,6 +97,17 @@ export default function NewLogScreen() {
     setLocating(false);
   }
 
+  function toggleCrew(id: string) {
+    setSelectedCrewIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      // Keep crew size in sync with selected count
+      setCrewSize(String(next.size || (job?.crew_size ?? '')));
+      return next;
+    });
+  }
+
   async function handleSubmit() {
     if (!unitsCompleted || isNaN(Number(unitsCompleted))) {
       Alert.alert('Missing field', 'Enter how many units were completed today.');
@@ -84,28 +116,32 @@ export default function NewLogScreen() {
 
     setSubmitting(true);
 
-    const { error } = await supabase.from('daily_logs').insert({
-      job_id: jobId,
-      logged_by: profile?.id,
-      log_date: logDate,
-      units_completed: Number(unitsCompleted),
-      task_id: selectedTaskId ?? null,
-      percent_complete: percentComplete ? Number(percentComplete) : null,
-      crew_size: crewSize ? Number(crewSize) : null,
-      hours_worked: hoursWorked ? Number(hoursWorked) : null,
-      weather_temp_f: weather?.temp_f ?? null,
-      weather_condition: weather?.condition ?? null,
-      weather_wind_mph: weather?.wind_mph ?? null,
-      weather_humidity: weather?.humidity ?? null,
-      weather_precip_in: weather?.precip_in ?? null,
-      log_latitude: latitude ?? null,
-      log_longitude: longitude ?? null,
-      notes: notes || null,
-    });
-
-    setSubmitting(false);
+    // 1. Insert the daily log
+    const { data: newLog, error } = await supabase
+      .from('daily_logs')
+      .insert({
+        job_id: jobId,
+        logged_by: profile?.id,
+        log_date: logDate,
+        units_completed: Number(unitsCompleted),
+        task_id: selectedTaskId ?? null,
+        percent_complete: percentComplete ? Number(percentComplete) : null,
+        crew_size: crewSize ? Number(crewSize) : null,
+        hours_worked: hoursWorked ? Number(hoursWorked) : null,
+        weather_temp_f: weather?.temp_f ?? null,
+        weather_condition: weather?.condition ?? null,
+        weather_wind_mph: weather?.wind_mph ?? null,
+        weather_humidity: weather?.humidity ?? null,
+        weather_precip_in: weather?.precip_in ?? null,
+        log_latitude: latitude ?? null,
+        log_longitude: longitude ?? null,
+        notes: notes || null,
+      })
+      .select()
+      .single();
 
     if (error) {
+      setSubmitting(false);
       if (error.code === '23505') {
         Alert.alert('Already logged', 'A log for this date already exists. Delete it first to re-log.');
       } else {
@@ -114,6 +150,30 @@ export default function NewLogScreen() {
       return;
     }
 
+    if (newLog) {
+      // 2. Save variable overrides (all current log values — even if same as job default)
+      if (logVariables.length > 0) {
+        await supabase.from('log_variable_overrides').insert(
+          logVariables.map(v => ({
+            daily_log_id: newLog.id,
+            variable_type_id: v.variable_type_id,
+            value: v.value,
+          }))
+        );
+      }
+
+      // 3. Save crew assignments
+      if (selectedCrewIds.size > 0) {
+        await supabase.from('log_crew_assignments').insert(
+          Array.from(selectedCrewIds).map(memberId => ({
+            daily_log_id: newLog.id,
+            crew_member_id: memberId,
+          }))
+        );
+      }
+    }
+
+    setSubmitting(false);
     router.back();
   }
 
@@ -183,7 +243,7 @@ export default function NewLogScreen() {
 
         <Text style={styles.sectionLabel}>LOG ENTRY</Text>
 
-        {/* Task selection — optional, only shown if job has tasks */}
+        {/* Task selection */}
         {tasks.length > 0 && (
           <>
             <Text style={styles.label}>Task worked on today</Text>
@@ -219,13 +279,15 @@ export default function NewLogScreen() {
         />
 
         <Text style={styles.label}>
-          {job ? `${job.unit.charAt(0).toUpperCase() + job.unit.slice(1)} completed today *` : 'Units completed *'}
+          {job
+            ? `${job.unit.charAt(0).toUpperCase() + job.unit.slice(1)} completed today *`
+            : 'Units completed *'}
         </Text>
         <TextInput
           style={styles.input}
           value={unitsCompleted}
           onChangeText={setUnitsCompleted}
-          placeholder={`e.g. ${job?.job_snapshots?.avg_units_per_day?.toFixed(0) ?? '12'}`}
+          placeholder={`e.g. ${snap?.avg_units_per_day?.toFixed(0) ?? '12'}`}
           placeholderTextColor={Colors.textMuted}
           keyboardType="numeric"
         />
@@ -236,6 +298,68 @@ export default function NewLogScreen() {
           </Text>
         ) : null}
 
+        {/* ── JOB CONDITIONS TODAY ───────────────────── */}
+        {/* Pre-filled from job defaults — change if conditions differ today */}
+        <Text style={styles.sectionLabel}>TODAY'S CONDITIONS</Text>
+        <Text style={styles.hint}>
+          Pre-filled from job defaults. Change any that are different today
+          — row length, pile length, wire gauge, etc. This data powers your
+          benchmarks automatically.
+        </Text>
+
+        <JobVariables
+          tradeCategory={job?.task_types?.category ?? undefined}
+          variables={logVariables}
+          onChange={setLogVariables}
+        />
+
+        {/* ── CREW ────────────────────────────────────── */}
+        <Text style={styles.sectionLabel}>CREW TODAY</Text>
+        <Text style={styles.hint}>
+          Tag who was on site. Builds per-person productivity data over time.
+        </Text>
+
+        {crewMembers.length === 0 ? (
+          <Text style={styles.noCrewText}>
+            No crew members added yet. Add them in Settings → Crew.
+          </Text>
+        ) : (
+          <View style={styles.crewGrid}>
+            {crewMembers.map(member => {
+              const selected = selectedCrewIds.has(member.id);
+              return (
+                <TouchableOpacity
+                  key={member.id}
+                  style={[styles.crewChip, selected && styles.crewChipSelected]}
+                  onPress={() => toggleCrew(member.id)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.crewInitial, selected && styles.crewInitialSelected]}>
+                    {member.name.charAt(0).toUpperCase()}
+                  </Text>
+                  <Text style={[styles.crewName, selected && styles.crewNameSelected]}>
+                    {member.name}
+                  </Text>
+                  {member.trade ? (
+                    <Text style={[styles.crewTrade, selected && styles.crewTradeSelected]}>
+                      {member.trade}
+                    </Text>
+                  ) : null}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
+        {selectedCrewIds.size > 0 && (
+          <Text style={styles.crewCount}>
+            {selectedCrewIds.size} crew member{selectedCrewIds.size !== 1 ? 's' : ''} selected
+          </Text>
+        )}
+
+        {/* ── NUMBERS ─────────────────────────────────── */}
+        <Text style={styles.sectionLabel}>DETAILS</Text>
+
         <Text style={styles.label}>Crew size today</Text>
         <TextInput
           style={styles.input}
@@ -245,6 +369,11 @@ export default function NewLogScreen() {
           placeholderTextColor={Colors.textMuted}
           keyboardType="numeric"
         />
+        {selectedCrewIds.size > 0 && (
+          <Text style={styles.hint}>
+            Auto-filled from tagged crew. Adjust if others were on site too.
+          </Text>
+        )}
 
         <Text style={styles.label}>Total crew hours worked</Text>
         <TextInput
@@ -261,7 +390,7 @@ export default function NewLogScreen() {
           style={styles.input}
           value={percentComplete}
           onChangeText={setPercentComplete}
-          placeholder="e.g. 40  (your gut feel on how far along this task is)"
+          placeholder="e.g. 40  (gut feel on how far along this task is)"
           placeholderTextColor={Colors.textMuted}
           keyboardType="numeric"
         />
@@ -271,7 +400,7 @@ export default function NewLogScreen() {
           style={[styles.input, styles.textarea]}
           value={notes}
           onChangeText={setNotes}
-          placeholder="Anything notable about today? Delays, conditions, equipment issues…"
+          placeholder="Anything notable? Delays, conditions, equipment issues…"
           placeholderTextColor={Colors.textMuted}
           multiline
           numberOfLines={3}
@@ -340,6 +469,7 @@ const styles = StyleSheet.create({
   retryText: { color: Colors.primary, fontWeight: '600' },
   weatherGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   coordsText: { fontSize: 11, color: Colors.textMuted },
+
   taskChip: {
     borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
     backgroundColor: Colors.bgCard, borderWidth: 1, borderColor: Colors.border,
@@ -354,12 +484,37 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2, marginTop: 8, marginBottom: -2,
   },
   label: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600', marginBottom: -4 },
-  hint: { color: Colors.textMuted, fontSize: 12, marginTop: -4 },
+  hint: { color: Colors.textMuted, fontSize: 12, marginTop: -2, lineHeight: 18 },
   input: {
     backgroundColor: Colors.bgInput, borderRadius: 12, padding: 16,
     color: Colors.textPrimary, fontSize: 16, borderWidth: 1, borderColor: Colors.border,
   },
   textarea: { minHeight: 80, textAlignVertical: 'top' },
+
+  // Crew tagger
+  noCrewText: { color: Colors.textMuted, fontSize: 13, fontStyle: 'italic' },
+  crewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  crewChip: {
+    alignItems: 'center', gap: 4, padding: 12, borderRadius: 14,
+    backgroundColor: Colors.bgCard, borderWidth: 1, borderColor: Colors.border,
+    minWidth: 80,
+  },
+  crewChipSelected: {
+    backgroundColor: Colors.primary + '22',
+    borderColor: Colors.primary,
+  },
+  crewInitial: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: Colors.bgInput, textAlign: 'center', lineHeight: 40,
+    fontSize: 18, fontWeight: '800', color: Colors.textSecondary,
+  },
+  crewInitialSelected: { backgroundColor: Colors.primary, color: '#fff' },
+  crewName: { fontSize: 12, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center' },
+  crewNameSelected: { color: Colors.primary },
+  crewTrade: { fontSize: 10, color: Colors.textMuted, textAlign: 'center' },
+  crewTradeSelected: { color: Colors.primary + 'aa' },
+  crewCount: { fontSize: 13, color: Colors.primary, fontWeight: '600', marginTop: -4 },
+
   submitBtn: {
     backgroundColor: Colors.primary, borderRadius: 12,
     padding: 18, alignItems: 'center', marginTop: 16,
