@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ScrollView, Alert,
+  KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
@@ -15,23 +15,24 @@ export default function SignupScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   async function handleSignup() {
+    setError('');
+    setSuccess('');
     if (!fullName || !companyName || !email || !password) {
-      Alert.alert('Missing fields', 'Please fill in all required fields.');
+      setError('Please fill in all required fields.');
       return;
     }
     if (password.length < 6) {
-      Alert.alert('Weak password', 'Password must be at least 6 characters.');
+      setError('Password must be at least 6 characters.');
       return;
     }
 
     setLoading(true);
 
-    // Single call — the handle_new_user() DB trigger atomically creates
-    // the company and profile from the metadata we pass here.
-    // No separate company insert or profile.update needed.
-    const { error } = await supabase.auth.signUp({
+    const { error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -45,20 +46,13 @@ export default function SignupScreen() {
 
     setLoading(false);
 
-    if (error) {
-      Alert.alert('Signup failed', error.message);
+    if (authError) {
+      setError(authError.message);
       return;
     }
 
-    // Supabase may require email confirmation depending on project settings.
-    // If email confirmation is enabled the user has no session yet — show a
-    // message instead of navigating. If disabled, the auth listener in
-    // useAuth will fire and the AuthGate will redirect automatically.
-    Alert.alert(
-      'Account created',
-      'Check your email to confirm your address, then sign in.',
-      [{ text: 'OK', onPress: () => router.replace('/(auth)/login') }]
-    );
+    setSuccess('Account created! Check your email to confirm your address, then sign in.');
+    setTimeout(() => router.replace('/(auth)/login'), 4000);
   }
 
   return (
@@ -128,6 +122,9 @@ export default function SignupScreen() {
             autoCapitalize="words"
           />
 
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {success ? <Text style={styles.successText}>{success}</Text> : null}
+
           <TouchableOpacity
             style={[styles.btn, loading && styles.btnDisabled]}
             onPress={handleSignup}
@@ -179,6 +176,8 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.6 },
   btnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  errorText: { color: '#ff6b6b', fontSize: 14, textAlign: 'center', backgroundColor: 'rgba(255,107,107,0.1)', padding: 12, borderRadius: 8 },
+  successText: { color: '#4caf50', fontSize: 14, textAlign: 'center', backgroundColor: 'rgba(76,175,80,0.1)', padding: 12, borderRadius: 8 },
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
   footerText: { color: Colors.textSecondary },
   link: { color: Colors.primary, fontWeight: '600' },
