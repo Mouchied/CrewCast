@@ -128,7 +128,7 @@ export default function JobDetailScreen() {
       estimated_hours: newTaskHours ? Number(newTaskHours) : null,
       unit: newTaskUnit.trim() || null,
       total_units: newTaskTotalUnits ? Number(newTaskTotalUnits) : null,
-      starting_units_completed: newTaskStartingUnits ? Number(newTaskStartingUnits) : 0,
+      ...(newTaskStartingUnits ? { starting_units_completed: Number(newTaskStartingUnits) } : {}),
       sequence_order: tasks.length,
     });
     if (!error) {
@@ -225,7 +225,7 @@ export default function JobDetailScreen() {
       estimated_hours: editTaskHours ? Number(editTaskHours) : null,
       unit: editTaskUnit.trim() || null,
       total_units: editTaskTotalUnits ? Number(editTaskTotalUnits) : null,
-      starting_units_completed: editTaskStartingUnits ? Number(editTaskStartingUnits) : 0,
+      ...(editTaskStartingUnits ? { starting_units_completed: Number(editTaskStartingUnits) } : {}),
     }).eq('id', editingTask.id);
     if (!error) {
       setShowEditTask(false);
