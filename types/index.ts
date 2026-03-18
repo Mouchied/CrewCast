@@ -40,6 +40,7 @@ export interface Task {
   estimated_crew_size?: number;
   unit?: string;
   total_units?: number;
+  starting_units_completed?: number;
   status: TaskStatus;
   created_at: string;
   updated_at: string;

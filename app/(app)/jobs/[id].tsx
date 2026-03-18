@@ -36,12 +36,14 @@ export default function JobDetailScreen() {
   const [newTaskHours, setNewTaskHours] = useState('');
   const [newTaskUnit, setNewTaskUnit] = useState('');
   const [newTaskTotalUnits, setNewTaskTotalUnits] = useState('');
+  const [newTaskStartingUnits, setNewTaskStartingUnits] = useState('');
   const [showEditTask, setShowEditTask] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editTaskName, setEditTaskName] = useState('');
   const [editTaskHours, setEditTaskHours] = useState('');
   const [editTaskUnit, setEditTaskUnit] = useState('');
   const [editTaskTotalUnits, setEditTaskTotalUnits] = useState('');
+  const [editTaskStartingUnits, setEditTaskStartingUnits] = useState('');
   const [showEditJob, setShowEditJob] = useState(false);
   const [editName, setEditName] = useState('');
   const [editTotalUnits, setEditTotalUnits] = useState('');
@@ -126,6 +128,7 @@ export default function JobDetailScreen() {
       estimated_hours: newTaskHours ? Number(newTaskHours) : null,
       unit: newTaskUnit.trim() || null,
       total_units: newTaskTotalUnits ? Number(newTaskTotalUnits) : null,
+      starting_units_completed: newTaskStartingUnits ? Number(newTaskStartingUnits) : 0,
       sequence_order: tasks.length,
     });
     if (!error) {
@@ -133,6 +136,7 @@ export default function JobDetailScreen() {
       setNewTaskHours('');
       setNewTaskUnit('');
       setNewTaskTotalUnits('');
+      setNewTaskStartingUnits('');
       setShowAddTask(false);
       fetchData();
     }
@@ -210,6 +214,7 @@ export default function JobDetailScreen() {
     setEditTaskHours(task.estimated_hours != null ? String(task.estimated_hours) : '');
     setEditTaskUnit(task.unit ?? '');
     setEditTaskTotalUnits(task.total_units != null ? String(task.total_units) : '');
+    setEditTaskStartingUnits(task.starting_units_completed != null && task.starting_units_completed !== 0 ? String(task.starting_units_completed) : '');
     setShowEditTask(true);
   }
 
@@ -220,6 +225,7 @@ export default function JobDetailScreen() {
       estimated_hours: editTaskHours ? Number(editTaskHours) : null,
       unit: editTaskUnit.trim() || null,
       total_units: editTaskTotalUnits ? Number(editTaskTotalUnits) : null,
+      starting_units_completed: editTaskStartingUnits ? Number(editTaskStartingUnits) : 0,
     }).eq('id', editingTask.id);
     if (!error) {
       setShowEditTask(false);
@@ -262,13 +268,16 @@ export default function JobDetailScreen() {
     ? Math.min(100, Math.round((displayCompleted / job.total_units) * 100))
     : 0;
 
-  // Per-task unit progress from logs
+  // Per-task unit progress: seed from starting offsets, then accumulate logs
   const taskProgress = logs.reduce((acc, log) => {
     if (log.task_id) {
       acc[log.task_id] = (acc[log.task_id] ?? 0) + (log.units_completed ?? 0);
     }
     return acc;
-  }, {} as Record<string, number>);
+  }, tasks.reduce((acc, t) => {
+    acc[t.id] = t.starting_units_completed ?? 0;
+    return acc;
+  }, {} as Record<string, number>));
 
   const paceColor = getPaceColor(snap?.pace_status);
   const forecastSentence = getForecastSentence(job);
@@ -644,6 +653,14 @@ export default function JobDetailScreen() {
               placeholderTextColor={Colors.textMuted}
               keyboardType="numeric"
             />
+            <TextInput
+              style={styles.modalInput}
+              value={editTaskStartingUnits}
+              onChangeText={setEditTaskStartingUnits}
+              placeholder="Units already done before tracking (optional)"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="numeric"
+            />
             <View style={styles.modalBtns}>
               <TouchableOpacity
                 style={styles.modalCancel}
@@ -702,6 +719,14 @@ export default function JobDetailScreen() {
               value={newTaskHours}
               onChangeText={setNewTaskHours}
               placeholder="Budgeted man-hours for this task (optional)"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="numeric"
+            />
+            <TextInput
+              style={styles.modalInput}
+              value={newTaskStartingUnits}
+              onChangeText={setNewTaskStartingUnits}
+              placeholder="Units already done before tracking (optional)"
               placeholderTextColor={Colors.textMuted}
               keyboardType="numeric"
             />
