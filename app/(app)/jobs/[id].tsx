@@ -21,10 +21,14 @@ export default function JobDetailScreen() {
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskHours, setNewTaskHours] = useState('');
+  const [newTaskUnit, setNewTaskUnit] = useState('');
+  const [newTaskTotalUnits, setNewTaskTotalUnits] = useState('');
   const [showEditTask, setShowEditTask] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editTaskName, setEditTaskName] = useState('');
   const [editTaskHours, setEditTaskHours] = useState('');
+  const [editTaskUnit, setEditTaskUnit] = useState('');
+  const [editTaskTotalUnits, setEditTaskTotalUnits] = useState('');
   const [showEditJob, setShowEditJob] = useState(false);
   const [editName, setEditName] = useState('');
   const [editTotalUnits, setEditTotalUnits] = useState('');
@@ -108,11 +112,15 @@ export default function JobDetailScreen() {
       job_id: id,
       name: newTaskName.trim(),
       estimated_hours: newTaskHours ? Number(newTaskHours) : null,
+      unit: newTaskUnit.trim() || null,
+      total_units: newTaskTotalUnits ? Number(newTaskTotalUnits) : null,
       sequence_order: tasks.length,
     });
     if (!error) {
       setNewTaskName('');
       setNewTaskHours('');
+      setNewTaskUnit('');
+      setNewTaskTotalUnits('');
       setShowAddTask(false);
       fetchData();
     }
@@ -187,6 +195,8 @@ export default function JobDetailScreen() {
     setEditingTask(task);
     setEditTaskName(task.name);
     setEditTaskHours(task.estimated_hours != null ? String(task.estimated_hours) : '');
+    setEditTaskUnit(task.unit ?? '');
+    setEditTaskTotalUnits(task.total_units != null ? String(task.total_units) : '');
     setShowEditTask(true);
   }
 
@@ -195,6 +205,8 @@ export default function JobDetailScreen() {
     const { error } = await supabase.from('tasks').update({
       name: editTaskName.trim(),
       estimated_hours: editTaskHours ? Number(editTaskHours) : null,
+      unit: editTaskUnit.trim() || null,
+      total_units: editTaskTotalUnits ? Number(editTaskTotalUnits) : null,
     }).eq('id', editingTask.id);
     if (!error) {
       setShowEditTask(false);
@@ -236,6 +248,14 @@ export default function JobDetailScreen() {
   const pct = snap && job.total_units > 0
     ? Math.min(100, Math.round((snap.units_completed / job.total_units) * 100))
     : 0;
+
+  // Per-task unit progress from logs
+  const taskProgress = logs.reduce((acc, log) => {
+    if (log.task_id) {
+      acc[log.task_id] = (acc[log.task_id] ?? 0) + (log.units_completed ?? 0);
+    }
+    return acc;
+  }, {} as Record<string, number>);
 
   const paceColor = getPaceColor(snap?.pace_status);
   const forecastSentence = getForecastSentence(job);
@@ -425,9 +445,24 @@ export default function JobDetailScreen() {
                   ]}>
                     {task.name}
                   </Text>
-                  {task.estimated_hours != null && (
+                  {task.total_units != null && task.unit ? (
+                    <View style={styles.taskProgressRow}>
+                      <View style={styles.taskProgressBg}>
+                        <View style={[
+                          styles.taskProgressFill,
+                          {
+                            width: `${Math.min(100, Math.round(((taskProgress[task.id] ?? 0) / task.total_units) * 100))}%` as any,
+                            backgroundColor: task.status === 'completed' ? Colors.success : Colors.primary,
+                          },
+                        ]} />
+                      </View>
+                      <Text style={styles.taskMeta}>
+                        {(taskProgress[task.id] ?? 0).toFixed(0)} / {task.total_units} {task.unit}
+                      </Text>
+                    </View>
+                  ) : task.estimated_hours != null ? (
                     <Text style={styles.taskMeta}>{task.estimated_hours} hrs estimated</Text>
-                  )}
+                  ) : null}
                 </View>
                 <Text style={[
                   styles.taskStatus,
@@ -539,7 +574,7 @@ export default function JobDetailScreen() {
         onRequestClose={() => setShowEditTask(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
+          <ScrollView contentContainerStyle={styles.modalSheet} keyboardShouldPersistTaps="handled">
             <Text style={styles.modalTitle}>Edit Task</Text>
             <TextInput
               style={styles.modalInput}
@@ -549,11 +584,31 @@ export default function JobDetailScreen() {
               placeholderTextColor={Colors.textMuted}
               autoFocus
             />
+            <View style={styles.taskUnitRow}>
+              <TextInput
+                style={[styles.modalInput, { flex: 1 }]}
+                value={editTaskTotalUnits}
+                onChangeText={setEditTaskTotalUnits}
+                placeholder="Total (e.g. 316)"
+                placeholderTextColor={Colors.textMuted}
+                keyboardType="numeric"
+              />
+              <TextInput
+                style={[styles.modalInput, { flex: 1 }]}
+                value={editTaskUnit}
+                onChangeText={setEditTaskUnit}
+                placeholder="Unit (e.g. rows)"
+                placeholderTextColor={Colors.textMuted}
+              />
+            </View>
+            <Text style={styles.taskUnitHint}>
+              Set the count this task is measured by — rows, combiners, feet, sets, etc.
+            </Text>
             <TextInput
               style={styles.modalInput}
               value={editTaskHours}
               onChangeText={setEditTaskHours}
-              placeholder="Estimated man-hours (optional)"
+              placeholder="Budgeted man-hours for this task (optional)"
               placeholderTextColor={Colors.textMuted}
               keyboardType="numeric"
             />
@@ -568,7 +623,7 @@ export default function JobDetailScreen() {
                 <Text style={styles.modalSaveText}>Save Task</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
 
@@ -580,21 +635,41 @@ export default function JobDetailScreen() {
         onRequestClose={() => setShowAddTask(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
+          <ScrollView contentContainerStyle={styles.modalSheet} keyboardShouldPersistTaps="handled">
             <Text style={styles.modalTitle}>Add Task</Text>
             <TextInput
               style={styles.modalInput}
               value={newTaskName}
               onChangeText={setNewTaskName}
-              placeholder="Task name (e.g. Racking install)"
+              placeholder="Task name (e.g. Plug mods)"
               placeholderTextColor={Colors.textMuted}
               autoFocus
             />
+            <View style={styles.taskUnitRow}>
+              <TextInput
+                style={[styles.modalInput, { flex: 1 }]}
+                value={newTaskTotalUnits}
+                onChangeText={setNewTaskTotalUnits}
+                placeholder="Total (e.g. 316)"
+                placeholderTextColor={Colors.textMuted}
+                keyboardType="numeric"
+              />
+              <TextInput
+                style={[styles.modalInput, { flex: 1 }]}
+                value={newTaskUnit}
+                onChangeText={setNewTaskUnit}
+                placeholder="Unit (e.g. rows)"
+                placeholderTextColor={Colors.textMuted}
+              />
+            </View>
+            <Text style={styles.taskUnitHint}>
+              Set the count this task is measured by — rows, combiners, feet, sets, etc.
+            </Text>
             <TextInput
               style={styles.modalInput}
               value={newTaskHours}
               onChangeText={setNewTaskHours}
-              placeholder="Estimated man-hours (optional)"
+              placeholder="Budgeted man-hours for this task (optional)"
               placeholderTextColor={Colors.textMuted}
               keyboardType="numeric"
             />
@@ -609,7 +684,7 @@ export default function JobDetailScreen() {
                 <Text style={styles.modalSaveText}>Add Task</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -780,6 +855,11 @@ const styles = StyleSheet.create({
   taskActionBtn: { padding: 6 },
   taskActionEdit: { fontSize: 15, color: Colors.textSecondary },
   taskActionDelete: { fontSize: 13, color: Colors.danger },
+  taskProgressRow: { gap: 3, marginTop: 4 },
+  taskProgressBg: { height: 4, borderRadius: 2, backgroundColor: Colors.bgInput, overflow: 'hidden' },
+  taskProgressFill: { height: '100%', borderRadius: 2 },
+  taskUnitRow: { flexDirection: 'row', gap: 10 },
+  taskUnitHint: { color: Colors.textMuted, fontSize: 12, lineHeight: 17, marginTop: -6 },
 
   logBtn: {
     backgroundColor: Colors.primary, borderRadius: 14,

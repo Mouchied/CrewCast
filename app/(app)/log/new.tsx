@@ -278,19 +278,33 @@ export default function NewLogScreen() {
           placeholderTextColor={Colors.textMuted}
         />
 
-        <Text style={styles.label}>
-          {job
+        {(() => {
+          const activeTask = tasks.find(t => t.id === selectedTaskId);
+          const unitLabel = activeTask?.unit
+            ? `${activeTask.unit.charAt(0).toUpperCase() + activeTask.unit.slice(1)} completed today *`
+            : job
             ? `${job.unit.charAt(0).toUpperCase() + job.unit.slice(1)} completed today *`
-            : 'Units completed *'}
-        </Text>
-        <TextInput
-          style={styles.input}
-          value={unitsCompleted}
-          onChangeText={setUnitsCompleted}
-          placeholder={`e.g. ${snap?.avg_units_per_day?.toFixed(0) ?? '12'}`}
-          placeholderTextColor={Colors.textMuted}
-          keyboardType="numeric"
-        />
+            : 'Units completed *';
+          const taskRemaining = activeTask?.total_units != null
+            ? ` (${activeTask.total_units} total for this task)`
+            : '';
+          return (
+            <>
+              <Text style={styles.label}>{unitLabel}</Text>
+              {taskRemaining ? (
+                <Text style={styles.hint}>{activeTask?.name}{taskRemaining}</Text>
+              ) : null}
+              <TextInput
+                style={styles.input}
+                value={unitsCompleted}
+                onChangeText={setUnitsCompleted}
+                placeholder={`e.g. ${snap?.avg_units_per_day?.toFixed(0) ?? '12'}`}
+                placeholderTextColor={Colors.textMuted}
+                keyboardType="numeric"
+              />
+            </>
+          );
+        })()}
 
         {snap?.avg_units_per_day ? (
           <Text style={styles.hint}>
