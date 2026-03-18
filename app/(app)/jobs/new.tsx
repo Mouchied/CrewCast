@@ -78,7 +78,6 @@ export default function NewJobScreen() {
   async function handleSubmit() {
     const errors: string[] = [];
     if (!name.trim()) errors.push('• Job name is required');
-    if (!totalUnits || isNaN(Number(totalUnits))) errors.push('• Total units is required');
     if (!selectedTaskType && !showCustomTask) errors.push('• Work type is required');
     if (showCustomTask && !customTask.trim()) errors.push('• Custom task name is required');
     if (showCustomTask && !customUnit.trim()) errors.push('• Unit of measure is required');
@@ -119,7 +118,7 @@ export default function NewJobScreen() {
         created_by: profile!.id,
         name: name.trim(),
         task_type_id: taskTypeId ?? null,
-        total_units: Number(totalUnits),
+        total_units: totalUnits ? Number(totalUnits) : 0,
         unit,
         start_date: startDate,
         target_end_date: targetEndDate || null,
@@ -253,25 +252,11 @@ export default function NewJobScreen() {
           </View>
         )}
 
-        <Text style={styles.label}>Total units to complete *</Text>
-        <TextInput
-          style={styles.input}
-          value={totalUnits}
-          onChangeText={setTotalUnits}
-          placeholder="e.g. 240"
-          placeholderTextColor={Colors.textMuted}
-          keyboardType="numeric"
-        />
-
-        <Text style={styles.label}>Units already completed (if starting mid-job)</Text>
-        <TextInput
-          style={styles.input}
-          value={startingUnits}
-          onChangeText={setStartingUnits}
-          placeholder="e.g. 80  (leave blank if starting fresh)"
-          placeholderTextColor={Colors.textMuted}
-          keyboardType="numeric"
-        />
+        <View style={styles.infoRow}>
+          <Text style={styles.infoText}>
+            Progress is tracked per task — set units and starting counts when you add tasks after creating the job.
+          </Text>
+        </View>
 
         <Text style={styles.label}>Man-hours already burned (if starting mid-job)</Text>
         <TextInput

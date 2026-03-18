@@ -57,6 +57,8 @@ export default function JobDetailScreen() {
   const [editNotes, setEditNotes] = useState('');
   const [editLocationName, setEditLocationName] = useState('');
   const [editSaving, setEditSaving] = useState(false);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   useEffect(() => { if (id) fetchData(); }, [id]);
 
@@ -183,6 +185,17 @@ export default function JobDetailScreen() {
     fetchData();
   }
 
+  async function reorderTask(fromIndex: number, toIndex: number) {
+    if (fromIndex === toIndex || toIndex < 0 || toIndex >= tasks.length) return;
+    const reordered = [...tasks];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+    setTasks(reordered); // optimistic update
+    await Promise.all(reordered.map((t, i) =>
+      supabase.from('tasks').update({ sequence_order: i }).eq('id', t.id)
+    ));
+  }
+
   async function deleteJob() {
     webConfirm('Delete job? This will permanently delete the job and all its logs. This cannot be undone.', async () => {
       const result = await supabase
@@ -262,11 +275,6 @@ export default function JobDetailScreen() {
   }
 
   const snap = job.job_snapshots;
-  // Before the first log fires the snapshot trigger, fall back to the starting offset
-  const displayCompleted = snap?.units_completed ?? job.starting_units_completed ?? 0;
-  const pct = job.total_units > 0
-    ? Math.min(100, Math.round((displayCompleted / job.total_units) * 100))
-    : 0;
 
   // Per-task unit progress: seed from starting offsets, then accumulate logs
   const taskProgress = logs.reduce((acc, log) => {
@@ -278,6 +286,23 @@ export default function JobDetailScreen() {
     acc[t.id] = t.starting_units_completed ?? 0;
     return acc;
   }, {} as Record<string, number>));
+
+  // Task-based progress: simple average % across tasks that have units set
+  const tasksWithUnits = tasks.filter(t => (t.total_units ?? 0) > 0);
+  const taskPcts = tasksWithUnits.map(t =>
+    Math.min(100, ((taskProgress[t.id] ?? 0) / (t.total_units ?? 1)) * 100)
+  );
+  const avgTaskPct = taskPcts.length > 0
+    ? taskPcts.reduce((a, b) => a + b, 0) / taskPcts.length
+    : null;
+
+  // Fallback to snapshot/job-level if no tasks have units
+  const displayCompleted = snap?.units_completed ?? job.starting_units_completed ?? 0;
+  const pct = avgTaskPct != null
+    ? Math.min(100, Math.round(avgTaskPct))
+    : (job.total_units > 0
+      ? Math.min(100, Math.round((displayCompleted / job.total_units) * 100))
+      : 0);
 
   const paceColor = getPaceColor(snap?.pace_status);
   const forecastSentence = getForecastSentence(job);
@@ -352,30 +377,24 @@ export default function JobDetailScreen() {
         </View>
 
         {/* ── PROGRESS ── */}
-        {(() => {
-          const isTaskMode = tasks.some(t => t.total_units != null && t.total_units > 0);
-          return (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Progress</Text>
-              <View style={styles.progressBg}>
-                <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: paceColor }]} />
-              </View>
-              <Text style={styles.progressLabel}>
-                {displayCompleted.toFixed(0)} of {job.total_units} {job.unit} — {pct}% complete
-              </Text>
-              {isTaskMode && (
-                <Text style={styles.progressHint}>
-                  Avg across {tasks.filter(t => t.total_units != null).length} tasks — each task tracked below
-                </Text>
-              )}
-              {snap?.units_remaining != null && (
-                <Text style={styles.remainingLabel}>
-                  {snap.units_remaining.toFixed(0)} {job.unit} remaining
-                </Text>
-              )}
-            </View>
-          );
-        })()}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Progress</Text>
+          <View style={styles.progressBg}>
+            <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: paceColor }]} />
+          </View>
+          <Text style={styles.progressLabel}>{pct}% complete</Text>
+          {tasksWithUnits.length > 0 ? (
+            <Text style={styles.progressHint}>
+              Avg of {tasksWithUnits.length} task{tasksWithUnits.length !== 1 ? 's' : ''} — adding new tasks reduces this %
+            </Text>
+          ) : job.total_units > 0 ? (
+            <Text style={styles.progressHint}>
+              {displayCompleted.toFixed(0)} of {job.total_units} {job.unit}
+            </Text>
+          ) : (
+            <Text style={styles.progressHint}>Add tasks with units to track progress</Text>
+          )}
+        </View>
 
         {/* ── STATS GRID ── */}
         <View style={styles.statsGrid}>
@@ -457,60 +476,101 @@ export default function JobDetailScreen() {
               Break the job into tasks to track progress per phase.
             </Text>
           ) : (
-            tasks.map(task => (
-              <View key={task.id} style={styles.taskRow}>
-                <TouchableOpacity
-                  onPress={() => toggleTaskStatus(task)}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            tasks.map((task, idx) => {
+              const webDragProps = Platform.OS === 'web' ? {
+                draggable: true,
+                onDragStart: () => setDragIndex(idx),
+                onDragOver: (e: any) => { e.preventDefault(); setDragOverIndex(idx); },
+                onDrop: (e: any) => {
+                  e.preventDefault();
+                  if (dragIndex !== null && dragIndex !== idx) reorderTask(dragIndex, idx);
+                  setDragIndex(null);
+                  setDragOverIndex(null);
+                },
+                onDragEnd: () => { setDragIndex(null); setDragOverIndex(null); },
+              } : {};
+              return (
+                <View
+                  key={task.id}
+                  style={[
+                    styles.taskRow,
+                    dragOverIndex === idx && dragIndex !== idx && styles.taskRowDragOver,
+                    dragIndex === idx && styles.taskRowDragging,
+                  ]}
+                  {...(webDragProps as any)}
                 >
-                  <View style={[
-                    styles.taskDot,
-                    task.status === 'completed' && { backgroundColor: Colors.success },
-                    task.status === 'active' && { backgroundColor: Colors.warning },
-                  ]} />
-                </TouchableOpacity>
-                <View style={{ flex: 1 }}>
-                  <Text style={[
-                    styles.taskName,
-                    task.status === 'completed' && { textDecorationLine: 'line-through', color: Colors.textMuted },
-                  ]}>
-                    {task.name}
-                  </Text>
-                  {task.total_units != null && task.unit ? (
-                    <View style={styles.taskProgressRow}>
-                      <View style={styles.taskProgressBg}>
-                        <View style={[
-                          styles.taskProgressFill,
-                          {
-                            width: `${Math.min(100, Math.round(((taskProgress[task.id] ?? 0) / task.total_units) * 100))}%` as any,
-                            backgroundColor: task.status === 'completed' ? Colors.success : Colors.primary,
-                          },
-                        ]} />
+                  <Text style={[styles.dragHandle, Platform.OS === 'web' && { cursor: 'grab' } as any]}>≡</Text>
+                  <TouchableOpacity
+                    onPress={() => toggleTaskStatus(task)}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <View style={[
+                      styles.taskDot,
+                      task.status === 'completed' && { backgroundColor: Colors.success },
+                      task.status === 'active' && { backgroundColor: Colors.warning },
+                    ]} />
+                  </TouchableOpacity>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[
+                      styles.taskName,
+                      task.status === 'completed' && { textDecorationLine: 'line-through', color: Colors.textMuted },
+                    ]}>
+                      {task.name}
+                    </Text>
+                    {task.total_units != null && task.unit ? (
+                      <View style={styles.taskProgressRow}>
+                        <View style={styles.taskProgressBg}>
+                          <View style={[
+                            styles.taskProgressFill,
+                            {
+                              width: `${Math.min(100, Math.round(((taskProgress[task.id] ?? 0) / task.total_units) * 100))}%` as any,
+                              backgroundColor: task.status === 'completed' ? Colors.success : Colors.primary,
+                            },
+                          ]} />
+                        </View>
+                        <Text style={styles.taskMeta}>
+                          {(taskProgress[task.id] ?? 0).toFixed(0)} / {task.total_units} {task.unit}
+                        </Text>
                       </View>
-                      <Text style={styles.taskMeta}>
-                        {(taskProgress[task.id] ?? 0).toFixed(0)} / {task.total_units} {task.unit}
-                      </Text>
+                    ) : task.estimated_hours != null ? (
+                      <Text style={styles.taskMeta}>{task.estimated_hours} hrs estimated</Text>
+                    ) : null}
+                  </View>
+                  <Text style={[
+                    styles.taskStatus,
+                    task.status === 'completed' && { color: Colors.success },
+                    task.status === 'active' && { color: Colors.warning },
+                  ]}>
+                    {task.status}
+                  </Text>
+                  <TouchableOpacity onPress={() => openEditTask(task)} style={styles.taskActionBtn}>
+                    <Text style={styles.taskActionEdit}>✎</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => deleteTask(task)} style={styles.taskActionBtn}>
+                    <Text style={styles.taskActionDelete}>✕</Text>
+                  </TouchableOpacity>
+                  {Platform.OS !== 'web' && (
+                    <View style={styles.reorderBtns}>
+                      <TouchableOpacity
+                        onPress={() => reorderTask(idx, idx - 1)}
+                        disabled={idx === 0}
+                        style={[styles.reorderBtn, idx === 0 && { opacity: 0.2 }]}
+                      >
+                        <Text style={styles.reorderBtnText}>▲</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => reorderTask(idx, idx + 1)}
+                        disabled={idx === tasks.length - 1}
+                        style={[styles.reorderBtn, idx === tasks.length - 1 && { opacity: 0.2 }]}
+                      >
+                        <Text style={styles.reorderBtnText}>▼</Text>
+                      </TouchableOpacity>
                     </View>
-                  ) : task.estimated_hours != null ? (
-                    <Text style={styles.taskMeta}>{task.estimated_hours} hrs estimated</Text>
-                  ) : null}
+                  )}
                 </View>
-                <Text style={[
-                  styles.taskStatus,
-                  task.status === 'completed' && { color: Colors.success },
-                  task.status === 'active' && { color: Colors.warning },
-                ]}>
-                  {task.status}
-                </Text>
-                <TouchableOpacity onPress={() => openEditTask(task)} style={styles.taskActionBtn}>
-                  <Text style={styles.taskActionEdit}>✎</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => deleteTask(task)} style={styles.taskActionBtn}>
-                  <Text style={styles.taskActionDelete}>✕</Text>
-                </TouchableOpacity>
-              </View>
-            ))
+              );
+            })
           )}
         </View>
 
@@ -918,6 +978,12 @@ const styles = StyleSheet.create({
   taskProgressFill: { height: '100%', borderRadius: 2 },
   taskUnitRow: { flexDirection: 'row', gap: 10 },
   taskUnitHint: { color: Colors.textMuted, fontSize: 12, lineHeight: 17, marginTop: -6 },
+  taskRowDragOver: { borderTopWidth: 2, borderTopColor: Colors.primary },
+  taskRowDragging: { opacity: 0.4 },
+  dragHandle: { fontSize: 18, color: Colors.textMuted, paddingHorizontal: 2 },
+  reorderBtns: { gap: 2 },
+  reorderBtn: { padding: 2 },
+  reorderBtnText: { fontSize: 10, color: Colors.textMuted },
 
   logBtn: {
     backgroundColor: Colors.primary, borderRadius: 14,
