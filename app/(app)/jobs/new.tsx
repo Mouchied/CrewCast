@@ -80,7 +80,7 @@ export default function NewJobScreen() {
       Alert.alert('Missing field', 'Total units is required.'); return;
     }
     if (!selectedTaskType && !showCustomTask) {
-      Alert.alert('Missing field', 'Select a task type.'); return;
+      Alert.alert('Missing field', 'Select a work type.'); return;
     }
     if (showCustomTask && (!customTask.trim() || !customUnit.trim())) {
       Alert.alert('Missing field', 'Enter custom task name and unit.'); return;
@@ -191,8 +191,8 @@ export default function NewJobScreen() {
           placeholderTextColor={Colors.textMuted}
         />
 
-        <Text style={styles.label}>Task type *</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+        <Text style={styles.label}>Work type *</Text>
+        <View style={styles.chipGrid}>
           {taskTypes.map(t => (
             <TouchableOpacity
               key={t.id}
@@ -203,7 +203,6 @@ export default function NewJobScreen() {
               onPress={() => {
                 setSelectedTaskType(t);
                 setShowCustomTask(false);
-                // Clear variables when task type changes (different trade, different catalog)
                 setJobVariables([]);
               }}
             >
@@ -223,7 +222,7 @@ export default function NewJobScreen() {
               + Custom
             </Text>
           </TouchableOpacity>
-        </ScrollView>
+        </View>
 
         {showCustomTask && (
           <>
@@ -433,11 +432,13 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.border,
   },
   textarea: { minHeight: 80, textAlignVertical: 'top' },
-  chipScroll: { marginTop: 4 },
+  chipGrid: {
+    flexDirection: 'row', flexWrap: 'wrap',
+    gap: 8, marginTop: 4,
+  },
   chip: {
     borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
     backgroundColor: Colors.bgCard, borderWidth: 1, borderColor: Colors.border,
-    marginRight: 8, marginBottom: 4,
   },
   chipSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   chipText: { color: Colors.textSecondary, fontWeight: '600', fontSize: 13 },
