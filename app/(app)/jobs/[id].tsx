@@ -187,8 +187,9 @@ export default function JobDetailScreen() {
       task.status === 'pending' ? 'active'
       : task.status === 'active' ? 'completed'
       : 'pending';
-    await supabase.from('tasks').update({ status: nextStatus }).eq('id', task.id);
-    fetchData();
+    const { error } = await supabase.from('tasks').update({ status: nextStatus }).eq('id', task.id);
+    if (error) Alert.alert('Error', error.message);
+    else fetchData();
   }
 
   function openEditTask(task: Task) {
@@ -220,13 +221,15 @@ export default function JobDetailScreen() {
   async function deleteTask(task: Task) {
     Alert.alert(
       'Delete task?',
-      `"${task.name}" will be permanently removed.`,
+      `"${task.name}" will be permanently removed. Any logs tagged to this task will be unlinked.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            // Unlink any logs referencing this task (avoids FK violation)
+            await supabase.from('daily_logs').update({ task_id: null }).eq('task_id', task.id);
             const { error } = await supabase.from('tasks').delete().eq('id', task.id);
             if (!error) fetchData();
             else Alert.alert('Error', error.message);
