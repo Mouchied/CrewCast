@@ -167,7 +167,7 @@ export default function NewJobScreen() {
     }
 
     setSubmitting(false);
-    router.replace('/(app)');
+    router.replace('/(app)/jobs');
   }
 
   return (

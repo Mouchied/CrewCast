@@ -100,7 +100,7 @@ export default function JobDetailScreen() {
       const { data, error } = result;
       if (error) Alert.alert('Error', error.message);
       else if (!data?.length) Alert.alert('Error', 'Permission denied — could not update job.');
-      else router.replace('/(app)');
+      else router.replace('/(app)/jobs');
     });
   }
 
@@ -190,7 +190,7 @@ export default function JobDetailScreen() {
       const { data, error } = result;
       if (error) Alert.alert('Error', error.message);
       else if (!data?.length) Alert.alert('Error', 'Permission denied — could not delete job.');
-      else router.replace('/(app)');
+      else router.replace('/(app)/jobs');
     });
   }
 
