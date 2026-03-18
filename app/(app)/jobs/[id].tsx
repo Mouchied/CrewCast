@@ -85,9 +85,14 @@ export default function JobDetailScreen() {
         {
           text: 'Complete',
           onPress: async () => {
-            const { error } = await supabase.from('jobs').update({ status: 'completed' }).eq('id', id);
-            if (!error) router.replace('/(app)');
-            else Alert.alert('Error', error.message);
+            const { data, error } = await supabase
+              .from('jobs')
+              .update({ status: 'completed' })
+              .eq('id', id)
+              .select('id');
+            if (error) Alert.alert('Error', error.message);
+            else if (!data?.length) Alert.alert('Error', 'Permission denied — could not update job.');
+            else router.replace('/(app)');
           },
         },
       ]
@@ -179,9 +184,14 @@ export default function JobDetailScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            const { error } = await supabase.from('jobs').delete().eq('id', id);
-            if (!error) router.replace('/(app)');
-            else Alert.alert('Error', error.message);
+            const { data, error } = await supabase
+              .from('jobs')
+              .delete()
+              .eq('id', id)
+              .select('id');
+            if (error) Alert.alert('Error', error.message);
+            else if (!data?.length) Alert.alert('Error', 'Permission denied — could not delete job.');
+            else router.replace('/(app)');
           },
         },
       ]
@@ -236,9 +246,14 @@ export default function JobDetailScreen() {
           onPress: async () => {
             // Unlink any logs referencing this task (avoids FK violation)
             await supabase.from('daily_logs').update({ task_id: null }).eq('task_id', task.id);
-            const { error } = await supabase.from('tasks').delete().eq('id', task.id);
-            if (!error) fetchData();
-            else Alert.alert('Error', error.message);
+            const { data, error } = await supabase
+              .from('tasks')
+              .delete()
+              .eq('id', task.id)
+              .select('id');
+            if (error) Alert.alert('Error', error.message);
+            else if (!data?.length) Alert.alert('Error', 'Permission denied — could not delete task.');
+            else fetchData();
           },
         },
       ]
