@@ -82,6 +82,7 @@ export default function NewJobScreen() {
     if (!selectedTaskType && !showCustomTask) errors.push('• Work type is required');
     if (showCustomTask && !customTask.trim()) errors.push('• Custom task name is required');
     if (showCustomTask && !customUnit.trim()) errors.push('• Unit of measure is required');
+    if (!profile?.company_id) errors.push('• Account not fully set up — contact support');
 
     if (errors.length > 0) {
       Alert.alert('Missing required fields', errors.join('\n'));
@@ -109,14 +110,15 @@ export default function NewJobScreen() {
       unit = newTask.unit;
     }
 
-    // Create the job
+    // Create the job — starting offsets go directly on the job row
+    // (migration 007 added starting_units_completed + starting_hours_used for this)
     const { data: newJob, error } = await supabase
       .from('jobs')
       .insert({
-        company_id: profile?.company_id,
-        created_by: profile?.id,
+        company_id: profile!.company_id,
+        created_by: profile!.id,
         name: name.trim(),
-        task_type_id: taskTypeId,
+        task_type_id: taskTypeId ?? null,
         total_units: Number(totalUnits),
         unit,
         start_date: startDate,
@@ -124,6 +126,8 @@ export default function NewJobScreen() {
         crew_size: crewSize ? Number(crewSize) : null,
         bid_hours: bidHours ? Number(bidHours) : null,
         bid_crew_size: bidCrewSize ? Number(bidCrewSize) : null,
+        starting_units_completed: startingUnits ? Number(startingUnits) : 0,
+        starting_hours_used: startingHours ? Number(startingHours) : 0,
         location_name: locationName || null,
         city: city || null,
         state: state || null,
@@ -135,24 +139,10 @@ export default function NewJobScreen() {
       .single();
 
     if (error || !newJob) {
+      console.error('Job create error:', error);
       Alert.alert('Error', error?.message ?? 'Failed to create job.');
       setSubmitting(false);
       return;
-    }
-
-    // Seed a starting log if the job is mid-progress
-    const hasStartingData = (startingUnits && Number(startingUnits) > 0)
-      || (startingHours && Number(startingHours) > 0);
-    if (hasStartingData) {
-      await supabase.from('daily_logs').insert({
-        job_id: newJob.id,
-        company_id: profile?.company_id,
-        logged_by: profile?.id,
-        log_date: startDate,
-        units_completed: startingUnits ? Number(startingUnits) : 0,
-        hours_worked: startingHours ? Number(startingHours) : null,
-        notes: 'Starting entry — work completed before this job was added to CrewCast.',
-      });
     }
 
     // Save job variables if any were added
