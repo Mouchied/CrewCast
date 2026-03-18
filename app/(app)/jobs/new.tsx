@@ -37,6 +37,7 @@ export default function NewJobScreen() {
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [startingUnits, setStartingUnits] = useState('');
+  const [startingHours, setStartingHours] = useState('');
   const [customTask, setCustomTask] = useState('');
   const [customUnit, setCustomUnit] = useState('');
   const [showCustomTask, setShowCustomTask] = useState(false);
@@ -75,15 +76,16 @@ export default function NewJobScreen() {
   }
 
   async function handleSubmit() {
-    if (!name.trim()) { Alert.alert('Missing field', 'Job name is required.'); return; }
-    if (!totalUnits || isNaN(Number(totalUnits))) {
-      Alert.alert('Missing field', 'Total units is required.'); return;
-    }
-    if (!selectedTaskType && !showCustomTask) {
-      Alert.alert('Missing field', 'Select a work type.'); return;
-    }
-    if (showCustomTask && (!customTask.trim() || !customUnit.trim())) {
-      Alert.alert('Missing field', 'Enter custom task name and unit.'); return;
+    const errors: string[] = [];
+    if (!name.trim()) errors.push('• Job name is required');
+    if (!totalUnits || isNaN(Number(totalUnits))) errors.push('• Total units is required');
+    if (!selectedTaskType && !showCustomTask) errors.push('• Work type is required');
+    if (showCustomTask && !customTask.trim()) errors.push('• Custom task name is required');
+    if (showCustomTask && !customUnit.trim()) errors.push('• Unit of measure is required');
+
+    if (errors.length > 0) {
+      Alert.alert('Missing required fields', errors.join('\n'));
+      return;
     }
 
     setSubmitting(true);
@@ -138,15 +140,18 @@ export default function NewJobScreen() {
       return;
     }
 
-    // Seed a starting-units log if the job is mid-progress
-    if (startingUnits && Number(startingUnits) > 0) {
+    // Seed a starting log if the job is mid-progress
+    const hasStartingData = (startingUnits && Number(startingUnits) > 0)
+      || (startingHours && Number(startingHours) > 0);
+    if (hasStartingData) {
       await supabase.from('daily_logs').insert({
         job_id: newJob.id,
         company_id: profile?.company_id,
         logged_by: profile?.id,
         log_date: startDate,
-        units_completed: Number(startingUnits),
-        notes: 'Starting units — work completed before this job was added to CrewCast.',
+        units_completed: startingUnits ? Number(startingUnits) : 0,
+        hours_worked: startingHours ? Number(startingHours) : null,
+        notes: 'Starting entry — work completed before this job was added to CrewCast.',
       });
     }
 
@@ -274,6 +279,16 @@ export default function NewJobScreen() {
           value={startingUnits}
           onChangeText={setStartingUnits}
           placeholder="e.g. 80  (leave blank if starting fresh)"
+          placeholderTextColor={Colors.textMuted}
+          keyboardType="numeric"
+        />
+
+        <Text style={styles.label}>Man-hours already burned (if starting mid-job)</Text>
+        <TextInput
+          style={styles.input}
+          value={startingHours}
+          onChangeText={setStartingHours}
+          placeholder="e.g. 160  (leave blank if starting fresh)"
           placeholderTextColor={Colors.textMuted}
           keyboardType="numeric"
         />
