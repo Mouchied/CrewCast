@@ -21,6 +21,10 @@ export default function JobDetailScreen() {
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskHours, setNewTaskHours] = useState('');
+  const [showEditTask, setShowEditTask] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editTaskName, setEditTaskName] = useState('');
+  const [editTaskHours, setEditTaskHours] = useState('');
   const [showEditJob, setShowEditJob] = useState(false);
   const [editName, setEditName] = useState('');
   const [editTotalUnits, setEditTotalUnits] = useState('');
@@ -74,10 +78,10 @@ export default function JobDetailScreen() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Complete',
-          style: 'destructive',
           onPress: async () => {
-            await supabase.from('jobs').update({ status: 'completed' }).eq('id', id);
-            router.replace('/(app)');
+            const { error } = await supabase.from('jobs').update({ status: 'completed' }).eq('id', id);
+            if (!error) router.replace('/(app)');
+            else Alert.alert('Error', error.message);
           },
         },
       ]
@@ -161,8 +165,9 @@ export default function JobDetailScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            await supabase.from('jobs').delete().eq('id', id);
-            router.replace('/(app)');
+            const { error } = await supabase.from('jobs').delete().eq('id', id);
+            if (!error) router.replace('/(app)');
+            else Alert.alert('Error', error.message);
           },
         },
       ]
@@ -176,6 +181,47 @@ export default function JobDetailScreen() {
       : 'pending';
     await supabase.from('tasks').update({ status: nextStatus }).eq('id', task.id);
     fetchData();
+  }
+
+  function openEditTask(task: Task) {
+    setEditingTask(task);
+    setEditTaskName(task.name);
+    setEditTaskHours(task.estimated_hours != null ? String(task.estimated_hours) : '');
+    setShowEditTask(true);
+  }
+
+  async function saveEditTask() {
+    if (!editingTask || !editTaskName.trim()) return;
+    const { error } = await supabase.from('tasks').update({
+      name: editTaskName.trim(),
+      estimated_hours: editTaskHours ? Number(editTaskHours) : null,
+    }).eq('id', editingTask.id);
+    if (!error) {
+      setShowEditTask(false);
+      setEditingTask(null);
+      fetchData();
+    } else {
+      Alert.alert('Error', error.message);
+    }
+  }
+
+  async function deleteTask(task: Task) {
+    Alert.alert(
+      'Delete task?',
+      `"${task.name}" will be permanently removed.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const { error } = await supabase.from('tasks').delete().eq('id', task.id);
+            if (!error) fetchData();
+            else Alert.alert('Error', error.message);
+          },
+        },
+      ]
+    );
   }
 
   if (loading || !job) {
@@ -360,17 +406,18 @@ export default function JobDetailScreen() {
             </Text>
           ) : (
             tasks.map(task => (
-              <TouchableOpacity
-                key={task.id}
-                style={styles.taskRow}
-                onPress={() => toggleTaskStatus(task)}
-                activeOpacity={0.7}
-              >
-                <View style={[
-                  styles.taskDot,
-                  task.status === 'completed' && { backgroundColor: Colors.success },
-                  task.status === 'active' && { backgroundColor: Colors.warning },
-                ]} />
+              <View key={task.id} style={styles.taskRow}>
+                <TouchableOpacity
+                  onPress={() => toggleTaskStatus(task)}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <View style={[
+                    styles.taskDot,
+                    task.status === 'completed' && { backgroundColor: Colors.success },
+                    task.status === 'active' && { backgroundColor: Colors.warning },
+                  ]} />
+                </TouchableOpacity>
                 <View style={{ flex: 1 }}>
                   <Text style={[
                     styles.taskName,
@@ -389,7 +436,13 @@ export default function JobDetailScreen() {
                 ]}>
                   {task.status}
                 </Text>
-              </TouchableOpacity>
+                <TouchableOpacity onPress={() => openEditTask(task)} style={styles.taskActionBtn}>
+                  <Text style={styles.taskActionEdit}>✎</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => deleteTask(task)} style={styles.taskActionBtn}>
+                  <Text style={styles.taskActionDelete}>✕</Text>
+                </TouchableOpacity>
+              </View>
             ))
           )}
         </View>
@@ -441,7 +494,8 @@ export default function JobDetailScreen() {
             <TextInput style={styles.modalInput} value={editName} onChangeText={setEditName} placeholderTextColor={Colors.textMuted} placeholder="Job name" />
 
             <Text style={styles.editLabel}>Total units *</Text>
-            <TextInput style={styles.modalInput} value={editTotalUnits} onChangeText={setEditTotalUnits} placeholderTextColor={Colors.textMuted} placeholder="e.g. 240" keyboardType="numeric" />
+            <Text style={styles.editHint}>The total count of what you're building or installing — e.g. 316 panels, 500 ft of pipe, 24 homes. Every daily log tracks units completed against this number.</Text>
+            <TextInput style={styles.modalInput} value={editTotalUnits} onChangeText={setEditTotalUnits} placeholderTextColor={Colors.textMuted} placeholder="e.g. 316" keyboardType="numeric" />
 
             <Text style={styles.editLabel}>Default crew size</Text>
             <TextInput style={styles.modalInput} value={editCrewSize} onChangeText={setEditCrewSize} placeholderTextColor={Colors.textMuted} placeholder="e.g. 4" keyboardType="numeric" />
@@ -474,6 +528,47 @@ export default function JobDetailScreen() {
             </View>
             <View style={{ height: 40 }} />
           </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Edit Task Modal */}
+      <Modal
+        visible={showEditTask}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEditTask(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>Edit Task</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={editTaskName}
+              onChangeText={setEditTaskName}
+              placeholder="Task name"
+              placeholderTextColor={Colors.textMuted}
+              autoFocus
+            />
+            <TextInput
+              style={styles.modalInput}
+              value={editTaskHours}
+              onChangeText={setEditTaskHours}
+              placeholder="Estimated man-hours (optional)"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="numeric"
+            />
+            <View style={styles.modalBtns}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setShowEditTask(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalSave} onPress={saveEditTask}>
+                <Text style={styles.modalSaveText}>Save Task</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </Modal>
 
@@ -633,6 +728,7 @@ const styles = StyleSheet.create({
     padding: 24, gap: 10, marginTop: 80,
   },
   editLabel: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600' },
+  editHint: { color: Colors.textMuted, fontSize: 12, lineHeight: 18, marginTop: -4 },
   content: { padding: 20, gap: 16 },
   jobName: { fontSize: 26, fontWeight: '800', color: Colors.textPrimary, lineHeight: 32 },
   location: { fontSize: 14, color: Colors.textSecondary },
@@ -681,6 +777,9 @@ const styles = StyleSheet.create({
   taskName: { fontSize: 15, color: Colors.textPrimary, fontWeight: '600' },
   taskMeta: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
   taskStatus: { fontSize: 11, color: Colors.textMuted, fontWeight: '600', textTransform: 'uppercase' },
+  taskActionBtn: { padding: 6 },
+  taskActionEdit: { fontSize: 15, color: Colors.textSecondary },
+  taskActionDelete: { fontSize: 13, color: Colors.danger },
 
   logBtn: {
     backgroundColor: Colors.primary, borderRadius: 14,
