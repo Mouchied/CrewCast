@@ -85,11 +85,13 @@ export default function JobDetailScreen() {
         {
           text: 'Complete',
           onPress: async () => {
-            const { data, error } = await supabase
+            const result = await supabase
               .from('jobs')
               .update({ status: 'completed' })
               .eq('id', id)
               .select('id');
+            console.log('[markComplete]', JSON.stringify(result));
+            const { data, error } = result;
             if (error) Alert.alert('Error', error.message);
             else if (!data?.length) Alert.alert('Error', 'Permission denied — could not update job.');
             else router.replace('/(app)');
@@ -184,11 +186,13 @@ export default function JobDetailScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            const { data, error } = await supabase
+            const result = await supabase
               .from('jobs')
               .delete()
               .eq('id', id)
               .select('id');
+            console.log('[deleteJob]', JSON.stringify(result));
+            const { data, error } = result;
             if (error) Alert.alert('Error', error.message);
             else if (!data?.length) Alert.alert('Error', 'Permission denied — could not delete job.');
             else router.replace('/(app)');
@@ -245,12 +249,15 @@ export default function JobDetailScreen() {
           style: 'destructive',
           onPress: async () => {
             // Unlink any logs referencing this task (avoids FK violation)
-            await supabase.from('daily_logs').update({ task_id: null }).eq('task_id', task.id);
-            const { data, error } = await supabase
+            const unlinkResult = await supabase.from('daily_logs').update({ task_id: null }).eq('task_id', task.id);
+            console.log('[deleteTask unlink]', JSON.stringify(unlinkResult));
+            const result = await supabase
               .from('tasks')
               .delete()
               .eq('id', task.id)
               .select('id');
+            console.log('[deleteTask]', JSON.stringify(result));
+            const { data, error } = result;
             if (error) Alert.alert('Error', error.message);
             else if (!data?.length) Alert.alert('Error', 'Permission denied — could not delete task.');
             else fetchData();
