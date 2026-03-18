@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert,
-  TextInput, Modal,
+  TextInput, Modal, Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
@@ -12,6 +12,19 @@ import JobVariables, { jobVariablesToPending } from '../../../components/JobVari
 export default function JobDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+
+  // Alert.alert onPress doesn't fire on Expo Web — use window.confirm instead
+  function webConfirm(message: string, onConfirm: () => void) {
+    if (Platform.OS === 'web') {
+      // eslint-disable-next-line no-alert
+      if (window.confirm(message)) onConfirm();
+    } else {
+      Alert.alert('Confirm', message, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'OK', style: 'destructive', onPress: onConfirm },
+      ]);
+    }
+  }
 
   const [job, setJob] = useState<Job | null>(null);
   const [logs, setLogs] = useState<DailyLog[]>([]);
@@ -77,28 +90,18 @@ export default function JobDetailScreen() {
   }
 
   async function markComplete() {
-    Alert.alert(
-      'Mark job complete?',
-      'This will archive the job and remove it from your active list.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Complete',
-          onPress: async () => {
-            const result = await supabase
-              .from('jobs')
-              .update({ status: 'completed' })
-              .eq('id', id)
-              .select('id');
-            console.log('[markComplete]', JSON.stringify(result));
-            const { data, error } = result;
-            if (error) Alert.alert('Error', error.message);
-            else if (!data?.length) Alert.alert('Error', 'Permission denied — could not update job.');
-            else router.replace('/(app)');
-          },
-        },
-      ]
-    );
+    webConfirm('Mark this job complete? It will be archived and removed from your active list.', async () => {
+      const result = await supabase
+        .from('jobs')
+        .update({ status: 'completed' })
+        .eq('id', id)
+        .select('id');
+      console.log('[markComplete]', JSON.stringify(result));
+      const { data, error } = result;
+      if (error) Alert.alert('Error', error.message);
+      else if (!data?.length) Alert.alert('Error', 'Permission denied — could not update job.');
+      else router.replace('/(app)');
+    });
   }
 
   async function deleteLog(logId: string) {
@@ -177,29 +180,18 @@ export default function JobDetailScreen() {
   }
 
   async function deleteJob() {
-    Alert.alert(
-      'Delete job?',
-      'This will permanently delete the job and all its logs. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const result = await supabase
-              .from('jobs')
-              .delete()
-              .eq('id', id)
-              .select('id');
-            console.log('[deleteJob]', JSON.stringify(result));
-            const { data, error } = result;
-            if (error) Alert.alert('Error', error.message);
-            else if (!data?.length) Alert.alert('Error', 'Permission denied — could not delete job.');
-            else router.replace('/(app)');
-          },
-        },
-      ]
-    );
+    webConfirm('Delete job? This will permanently delete the job and all its logs. This cannot be undone.', async () => {
+      const result = await supabase
+        .from('jobs')
+        .delete()
+        .eq('id', id)
+        .select('id');
+      console.log('[deleteJob]', JSON.stringify(result));
+      const { data, error } = result;
+      if (error) Alert.alert('Error', error.message);
+      else if (!data?.length) Alert.alert('Error', 'Permission denied — could not delete job.');
+      else router.replace('/(app)');
+    });
   }
 
   async function toggleTaskStatus(task: Task) {
@@ -239,32 +231,20 @@ export default function JobDetailScreen() {
   }
 
   async function deleteTask(task: Task) {
-    Alert.alert(
-      'Delete task?',
-      `"${task.name}" will be permanently removed. Any logs tagged to this task will be unlinked.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            // Unlink any logs referencing this task (avoids FK violation)
-            const unlinkResult = await supabase.from('daily_logs').update({ task_id: null }).eq('task_id', task.id);
-            console.log('[deleteTask unlink]', JSON.stringify(unlinkResult));
-            const result = await supabase
-              .from('tasks')
-              .delete()
-              .eq('id', task.id)
-              .select('id');
-            console.log('[deleteTask]', JSON.stringify(result));
-            const { data, error } = result;
-            if (error) Alert.alert('Error', error.message);
-            else if (!data?.length) Alert.alert('Error', 'Permission denied — could not delete task.');
-            else fetchData();
-          },
-        },
-      ]
-    );
+    webConfirm(`Delete task "${task.name}"? Any logs tagged to this task will be unlinked.`, async () => {
+      const unlinkResult = await supabase.from('daily_logs').update({ task_id: null }).eq('task_id', task.id);
+      console.log('[deleteTask unlink]', JSON.stringify(unlinkResult));
+      const result = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', task.id)
+        .select('id');
+      console.log('[deleteTask]', JSON.stringify(result));
+      const { data, error } = result;
+      if (error) Alert.alert('Error', error.message);
+      else if (!data?.length) Alert.alert('Error', 'Permission denied — could not delete task.');
+      else fetchData();
+    });
   }
 
   if (loading || !job) {
