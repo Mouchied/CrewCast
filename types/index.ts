@@ -75,6 +75,8 @@ export interface Job {
   longitude?: number;
   climate_zone?: string;
   crew_size?: number;
+  starting_units_completed?: number;
+  starting_hours_used?: number;
   equipment_notes?: string;
   notes?: string;
   created_at: string;

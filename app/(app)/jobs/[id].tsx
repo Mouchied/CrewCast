@@ -35,6 +35,8 @@ export default function JobDetailScreen() {
   const [editCrewSize, setEditCrewSize] = useState('');
   const [editBidHours, setEditBidHours] = useState('');
   const [editBidCrewSize, setEditBidCrewSize] = useState('');
+  const [editStartingUnits, setEditStartingUnits] = useState('');
+  const [editStartingHours, setEditStartingHours] = useState('');
   const [editStartDate, setEditStartDate] = useState('');
   const [editTargetEndDate, setEditTargetEndDate] = useState('');
   const [editNotes, setEditNotes] = useState('');
@@ -133,6 +135,8 @@ export default function JobDetailScreen() {
     setEditCrewSize(job.crew_size != null ? String(job.crew_size) : '');
     setEditBidHours(job.bid_hours != null ? String(job.bid_hours) : '');
     setEditBidCrewSize(job.bid_crew_size != null ? String(job.bid_crew_size) : '');
+    setEditStartingUnits(job.starting_units_completed != null ? String(job.starting_units_completed) : '');
+    setEditStartingHours(job.starting_hours_used != null ? String(job.starting_hours_used) : '');
     setEditStartDate(job.start_date ?? '');
     setEditTargetEndDate(job.target_end_date ?? '');
     setEditNotes(job.notes ?? '');
@@ -152,6 +156,8 @@ export default function JobDetailScreen() {
       crew_size: editCrewSize ? Number(editCrewSize) : null,
       bid_hours: editBidHours ? Number(editBidHours) : null,
       bid_crew_size: editBidCrewSize ? Number(editBidCrewSize) : null,
+      starting_units_completed: editStartingUnits ? Number(editStartingUnits) : 0,
+      starting_hours_used: editStartingHours ? Number(editStartingHours) : 0,
       start_date: editStartDate || null,
       target_end_date: editTargetEndDate || null,
       notes: editNotes || null,
@@ -248,8 +254,10 @@ export default function JobDetailScreen() {
   }
 
   const snap = job.job_snapshots;
-  const pct = snap && job.total_units > 0
-    ? Math.min(100, Math.round((snap.units_completed / job.total_units) * 100))
+  // Before the first log fires the snapshot trigger, fall back to the starting offset
+  const displayCompleted = snap?.units_completed ?? job.starting_units_completed ?? 0;
+  const pct = job.total_units > 0
+    ? Math.min(100, Math.round((displayCompleted / job.total_units) * 100))
     : 0;
 
   // Per-task unit progress from logs
@@ -339,7 +347,7 @@ export default function JobDetailScreen() {
             <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: paceColor }]} />
           </View>
           <Text style={styles.progressLabel}>
-            {snap?.units_completed?.toFixed(0) ?? 0} of {job.total_units} {job.unit} — {pct}% complete
+            {displayCompleted.toFixed(0)} of {job.total_units} {job.unit} — {pct}% complete
           </Text>
           {snap?.units_remaining != null && (
             <Text style={styles.remainingLabel}>
@@ -539,7 +547,16 @@ export default function JobDetailScreen() {
             <TextInput style={styles.modalInput} value={editCrewSize} onChangeText={setEditCrewSize} placeholderTextColor={Colors.textMuted} placeholder="e.g. 4" keyboardType="numeric" />
 
             <Text style={styles.editLabel}>Bid man-hours</Text>
-            <TextInput style={styles.modalInput} value={editBidHours} onChangeText={setEditBidHours} placeholderTextColor={Colors.textMuted} placeholder="e.g. 320" keyboardType="numeric" />
+            <Text style={styles.editHint}>Total labor hours in your bid/contract for this job.</Text>
+            <TextInput style={styles.modalInput} value={editBidHours} onChangeText={setEditBidHours} placeholderTextColor={Colors.textMuted} placeholder="e.g. 1584" keyboardType="numeric" />
+
+            <Text style={styles.editLabel}>Hours already used (starting offset)</Text>
+            <Text style={styles.editHint}>Man-hours already burned before you started tracking in CrewCast. Used for accurate burn rate from day one.</Text>
+            <TextInput style={styles.modalInput} value={editStartingHours} onChangeText={setEditStartingHours} placeholderTextColor={Colors.textMuted} placeholder="e.g. 320" keyboardType="numeric" />
+
+            <Text style={styles.editLabel}>Units already completed (starting offset)</Text>
+            <Text style={styles.editHint}>Rows/units done before you started logging. Progress bar and ETA will start from here.</Text>
+            <TextInput style={styles.modalInput} value={editStartingUnits} onChangeText={setEditStartingUnits} placeholderTextColor={Colors.textMuted} placeholder="e.g. 212" keyboardType="numeric" />
 
             <Text style={styles.editLabel}>Bid crew size</Text>
             <TextInput style={styles.modalInput} value={editBidCrewSize} onChangeText={setEditBidCrewSize} placeholderTextColor={Colors.textMuted} placeholder="e.g. 4" keyboardType="numeric" />
