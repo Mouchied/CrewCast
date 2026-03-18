@@ -341,20 +341,30 @@ export default function JobDetailScreen() {
         </View>
 
         {/* ── PROGRESS ── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Progress</Text>
-          <View style={styles.progressBg}>
-            <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: paceColor }]} />
-          </View>
-          <Text style={styles.progressLabel}>
-            {displayCompleted.toFixed(0)} of {job.total_units} {job.unit} — {pct}% complete
-          </Text>
-          {snap?.units_remaining != null && (
-            <Text style={styles.remainingLabel}>
-              {snap.units_remaining.toFixed(0)} {job.unit} remaining
-            </Text>
-          )}
-        </View>
+        {(() => {
+          const isTaskMode = tasks.some(t => t.total_units != null && t.total_units > 0);
+          return (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Progress</Text>
+              <View style={styles.progressBg}>
+                <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: paceColor }]} />
+              </View>
+              <Text style={styles.progressLabel}>
+                {displayCompleted.toFixed(0)} of {job.total_units} {job.unit} — {pct}% complete
+              </Text>
+              {isTaskMode && (
+                <Text style={styles.progressHint}>
+                  Avg across {tasks.filter(t => t.total_units != null).length} tasks — each task tracked below
+                </Text>
+              )}
+              {snap?.units_remaining != null && (
+                <Text style={styles.remainingLabel}>
+                  {snap.units_remaining.toFixed(0)} {job.unit} remaining
+                </Text>
+              )}
+            </View>
+          );
+        })()}
 
         {/* ── STATS GRID ── */}
         <View style={styles.statsGrid}>
@@ -846,6 +856,7 @@ const styles = StyleSheet.create({
   progressFill: { height: '100%', borderRadius: 5 },
   progressLabel: { fontSize: 14, color: Colors.textPrimary, fontWeight: '600' },
   remainingLabel: { fontSize: 13, color: Colors.textSecondary },
+  progressHint: { fontSize: 12, color: Colors.textMuted, fontStyle: 'italic' },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   mutedText: { color: Colors.textMuted, fontSize: 14, lineHeight: 21 },
 

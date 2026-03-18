@@ -247,6 +247,11 @@ export default function NewLogScreen() {
         {tasks.length > 0 && (
           <>
             <Text style={styles.label}>Task worked on today</Text>
+            {tasks.some(t => t.total_units != null) && !selectedTaskId && (
+              <Text style={styles.taskWarning}>
+                This job tracks progress by task. Select a task so your units count toward job progress.
+              </Text>
+            )}
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {[{ id: null, name: 'General / whole job' } as any, ...tasks].map(t => (
                 <TouchableOpacity
@@ -484,6 +489,12 @@ const styles = StyleSheet.create({
   weatherGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   coordsText: { fontSize: 11, color: Colors.textMuted },
 
+  taskWarning: {
+    color: Colors.warning ?? '#f59e0b',
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 4,
+  },
   taskChip: {
     borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
     backgroundColor: Colors.bgCard, borderWidth: 1, borderColor: Colors.border,
