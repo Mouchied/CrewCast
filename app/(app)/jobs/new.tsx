@@ -36,6 +36,7 @@ export default function NewJobScreen() {
   const [longitude, setLongitude] = useState<number | null>(null);
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [startingUnits, setStartingUnits] = useState('');
   const [customTask, setCustomTask] = useState('');
   const [customUnit, setCustomUnit] = useState('');
   const [showCustomTask, setShowCustomTask] = useState(false);
@@ -135,6 +136,18 @@ export default function NewJobScreen() {
       Alert.alert('Error', error?.message ?? 'Failed to create job.');
       setSubmitting(false);
       return;
+    }
+
+    // Seed a starting-units log if the job is mid-progress
+    if (startingUnits && Number(startingUnits) > 0) {
+      await supabase.from('daily_logs').insert({
+        job_id: newJob.id,
+        company_id: profile?.company_id,
+        logged_by: profile?.id,
+        log_date: startDate,
+        units_completed: Number(startingUnits),
+        notes: 'Starting units — work completed before this job was added to CrewCast.',
+      });
     }
 
     // Save job variables if any were added
@@ -252,6 +265,16 @@ export default function NewJobScreen() {
           value={totalUnits}
           onChangeText={setTotalUnits}
           placeholder="e.g. 240"
+          placeholderTextColor={Colors.textMuted}
+          keyboardType="numeric"
+        />
+
+        <Text style={styles.label}>Units already completed (if starting mid-job)</Text>
+        <TextInput
+          style={styles.input}
+          value={startingUnits}
+          onChangeText={setStartingUnits}
+          placeholder="e.g. 80  (leave blank if starting fresh)"
           placeholderTextColor={Colors.textMuted}
           keyboardType="numeric"
         />

@@ -21,6 +21,17 @@ export default function JobDetailScreen() {
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskHours, setNewTaskHours] = useState('');
+  const [showEditJob, setShowEditJob] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editTotalUnits, setEditTotalUnits] = useState('');
+  const [editCrewSize, setEditCrewSize] = useState('');
+  const [editBidHours, setEditBidHours] = useState('');
+  const [editBidCrewSize, setEditBidCrewSize] = useState('');
+  const [editStartDate, setEditStartDate] = useState('');
+  const [editTargetEndDate, setEditTargetEndDate] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editLocationName, setEditLocationName] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
 
   useEffect(() => { if (id) fetchData(); }, [id]);
 
@@ -103,6 +114,61 @@ export default function JobDetailScreen() {
     }
   }
 
+  function openEditJob() {
+    if (!job) return;
+    setEditName(job.name);
+    setEditTotalUnits(String(job.total_units));
+    setEditCrewSize(job.crew_size != null ? String(job.crew_size) : '');
+    setEditBidHours(job.bid_hours != null ? String(job.bid_hours) : '');
+    setEditBidCrewSize(job.bid_crew_size != null ? String(job.bid_crew_size) : '');
+    setEditStartDate(job.start_date ?? '');
+    setEditTargetEndDate(job.target_end_date ?? '');
+    setEditNotes(job.notes ?? '');
+    setEditLocationName(job.location_name ?? '');
+    setShowEditJob(true);
+  }
+
+  async function saveEditJob() {
+    if (!editName.trim()) { Alert.alert('Missing field', 'Job name is required.'); return; }
+    if (!editTotalUnits || isNaN(Number(editTotalUnits))) {
+      Alert.alert('Missing field', 'Total units is required.'); return;
+    }
+    setEditSaving(true);
+    const { error } = await supabase.from('jobs').update({
+      name: editName.trim(),
+      total_units: Number(editTotalUnits),
+      crew_size: editCrewSize ? Number(editCrewSize) : null,
+      bid_hours: editBidHours ? Number(editBidHours) : null,
+      bid_crew_size: editBidCrewSize ? Number(editBidCrewSize) : null,
+      start_date: editStartDate || null,
+      target_end_date: editTargetEndDate || null,
+      notes: editNotes || null,
+      location_name: editLocationName || null,
+    }).eq('id', id);
+    setEditSaving(false);
+    if (error) { Alert.alert('Error', error.message); return; }
+    setShowEditJob(false);
+    fetchData();
+  }
+
+  async function deleteJob() {
+    Alert.alert(
+      'Delete job?',
+      'This will permanently delete the job and all its logs. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await supabase.from('jobs').delete().eq('id', id);
+            router.replace('/(app)');
+          },
+        },
+      ]
+    );
+  }
+
   async function toggleTaskStatus(task: Task) {
     const nextStatus: Task['status'] =
       task.status === 'pending' ? 'active'
@@ -145,9 +211,17 @@ export default function JobDetailScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={markComplete} style={styles.completeBtn}>
-          <Text style={styles.completeBtnText}>Mark complete</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity onPress={openEditJob} style={styles.editBtn}>
+            <Text style={styles.editBtnText}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={deleteJob} style={styles.deleteBtn}>
+            <Text style={styles.deleteBtnText}>Delete</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={markComplete} style={styles.completeBtn}>
+            <Text style={styles.completeBtnText}>Mark complete</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -352,6 +426,57 @@ export default function JobDetailScreen() {
         <View style={{ height: 60 }} />
       </ScrollView>
 
+      {/* Edit Job Modal */}
+      <Modal
+        visible={showEditJob}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEditJob(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <ScrollView contentContainerStyle={styles.editModalSheet} keyboardShouldPersistTaps="handled">
+            <Text style={styles.modalTitle}>Edit Job</Text>
+
+            <Text style={styles.editLabel}>Job name *</Text>
+            <TextInput style={styles.modalInput} value={editName} onChangeText={setEditName} placeholderTextColor={Colors.textMuted} placeholder="Job name" />
+
+            <Text style={styles.editLabel}>Total units *</Text>
+            <TextInput style={styles.modalInput} value={editTotalUnits} onChangeText={setEditTotalUnits} placeholderTextColor={Colors.textMuted} placeholder="e.g. 240" keyboardType="numeric" />
+
+            <Text style={styles.editLabel}>Default crew size</Text>
+            <TextInput style={styles.modalInput} value={editCrewSize} onChangeText={setEditCrewSize} placeholderTextColor={Colors.textMuted} placeholder="e.g. 4" keyboardType="numeric" />
+
+            <Text style={styles.editLabel}>Bid man-hours</Text>
+            <TextInput style={styles.modalInput} value={editBidHours} onChangeText={setEditBidHours} placeholderTextColor={Colors.textMuted} placeholder="e.g. 320" keyboardType="numeric" />
+
+            <Text style={styles.editLabel}>Bid crew size</Text>
+            <TextInput style={styles.modalInput} value={editBidCrewSize} onChangeText={setEditBidCrewSize} placeholderTextColor={Colors.textMuted} placeholder="e.g. 4" keyboardType="numeric" />
+
+            <Text style={styles.editLabel}>Start date</Text>
+            <TextInput style={styles.modalInput} value={editStartDate} onChangeText={setEditStartDate} placeholderTextColor={Colors.textMuted} placeholder="YYYY-MM-DD" />
+
+            <Text style={styles.editLabel}>Target end date</Text>
+            <TextInput style={styles.modalInput} value={editTargetEndDate} onChangeText={setEditTargetEndDate} placeholderTextColor={Colors.textMuted} placeholder="YYYY-MM-DD" />
+
+            <Text style={styles.editLabel}>Location name</Text>
+            <TextInput style={styles.modalInput} value={editLocationName} onChangeText={setEditLocationName} placeholderTextColor={Colors.textMuted} placeholder="e.g. Midland, TX" />
+
+            <Text style={styles.editLabel}>Notes</Text>
+            <TextInput style={[styles.modalInput, { minHeight: 70, textAlignVertical: 'top' }]} value={editNotes} onChangeText={setEditNotes} placeholderTextColor={Colors.textMuted} placeholder="Any notes…" multiline />
+
+            <View style={styles.modalBtns}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setShowEditJob(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalSave, editSaving && { opacity: 0.6 }]} onPress={saveEditJob} disabled={editSaving}>
+                <Text style={styles.modalSaveText}>{editSaving ? 'Saving…' : 'Save Changes'}</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        </View>
+      </Modal>
+
       {/* Add Task Modal */}
       <Modal
         visible={showAddTask}
@@ -487,11 +612,27 @@ const styles = StyleSheet.create({
   },
   backBtn: { padding: 4 },
   backText: { color: Colors.primary, fontWeight: '600', fontSize: 15 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  editBtn: {
+    borderWidth: 1, borderColor: Colors.border, borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 6,
+  },
+  editBtnText: { color: Colors.textSecondary, fontWeight: '600', fontSize: 13 },
+  deleteBtn: {
+    borderWidth: 1, borderColor: Colors.danger, borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 6,
+  },
+  deleteBtnText: { color: Colors.danger, fontWeight: '600', fontSize: 13 },
   completeBtn: {
     borderWidth: 1, borderColor: Colors.success, borderRadius: 8,
-    paddingHorizontal: 12, paddingVertical: 6,
+    paddingHorizontal: 10, paddingVertical: 6,
   },
   completeBtnText: { color: Colors.success, fontWeight: '600', fontSize: 13 },
+  editModalSheet: {
+    backgroundColor: Colors.bgCard, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    padding: 24, gap: 10, marginTop: 80,
+  },
+  editLabel: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600' },
   content: { padding: 20, gap: 16 },
   jobName: { fontSize: 26, fontWeight: '800', color: Colors.textPrimary, lineHeight: 32 },
   location: { fontSize: 14, color: Colors.textSecondary },
