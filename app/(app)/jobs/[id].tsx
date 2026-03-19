@@ -590,7 +590,7 @@ export default function JobDetailScreen() {
           style={styles.logBtn}
           onPress={() => router.push({ pathname: '/(app)/log/new', params: { jobId: id } })}
         >
-          <Text style={styles.logBtnText}>+ Log Today's Work</Text>
+          <Text style={styles.logBtnText}>+ Log Work</Text>
         </TouchableOpacity>
 
         {/* Daily log history */}
