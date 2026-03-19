@@ -37,9 +37,12 @@ export default function NewLogScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (jobId) fetchJob();
+    if (jobId && profile?.company_id) fetchJob();
+  }, [jobId, profile?.company_id]);
+
+  useEffect(() => {
     autoCapture();
-  }, [jobId]);
+  }, []);
 
   async function fetchJob() {
     const [{ data: jobData }, { data: taskData }, { data: varData }, { data: memberData }] =
