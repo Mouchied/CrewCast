@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, RefreshControl,
   TouchableOpacity, Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../hooks/useAuth';
 import { Job } from '../../../types';
@@ -20,7 +21,10 @@ export default function JobsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<Filter>('active');
 
-  useEffect(() => { fetchJobs(); }, [profile, filter]);
+  // Refetch whenever the screen comes into focus (e.g. after creating a job)
+  useFocusEffect(
+    useCallback(() => { fetchJobs(); }, [profile, filter])
+  );
 
   async function fetchJobs() {
     if (!profile?.company_id) { setLoading(false); return; }
