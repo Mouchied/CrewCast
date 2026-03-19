@@ -61,7 +61,7 @@ export default function NewJobScreen() {
         setLocating(false);
         return;
       }
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
       const { latitude: lat, longitude: lng } = loc.coords;
       setLatitude(lat);
       setLongitude(lng);
