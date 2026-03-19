@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep:*)",
+      "Bash(gh pr:*)",
+      "Bash(grep -n \"CREATE TRIGGER\\\\|AFTER INSERT.*ON jobs\\\\|BEFORE INSERT.*ON jobs\" \"C:\\\\Users\\\\calkc\\\\CrewCast\\\\.claude\\\\worktrees\\\\laughing-chandrasekhar\\\\supabase\\\\migrations\"/*.sql)",
+      "Bash(grep -rn \"auth_company_id\" \"C:\\\\Users\\\\calkc\\\\CrewCast\\\\.claude\\\\worktrees\\\\laughing-chandrasekhar\\\\supabase\\\\migrations\"/*.sql)"
+    ]
+  }
+}
