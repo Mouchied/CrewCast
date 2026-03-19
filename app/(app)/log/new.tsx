@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Alert, ActivityIndicator,
@@ -12,6 +12,24 @@ import { Colors } from '../../../constants/Colors';
 import { fetchWeather } from '../../../lib/weather';
 import JobVariables, { PendingVariable, jobVariablesToPending } from '../../../components/JobVariables';
 
+type TaskEntry = {
+  localId: string;
+  taskId: string | null;
+  unitsCompleted: string;
+  crewIds: Set<string>;
+  hoursWorked: string;
+};
+
+function makeEntry(): TaskEntry {
+  return {
+    localId: Math.random().toString(36).slice(2),
+    taskId: null,
+    unitsCompleted: '',
+    crewIds: new Set(),
+    hoursWorked: '',
+  };
+}
+
 export default function NewLogScreen() {
   const router = useRouter();
   const { jobId } = useLocalSearchParams<{ jobId: string }>();
@@ -20,15 +38,11 @@ export default function NewLogScreen() {
   const [job, setJob] = useState<Job | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [crewMembers, setCrewMembers] = useState<CrewMember[]>([]);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [selectedCrewIds, setSelectedCrewIds] = useState<Set<string>>(new Set());
+
+  const [taskEntries, setTaskEntries] = useState<TaskEntry[]>([makeEntry()]);
   const [percentComplete, setPercentComplete] = useState('');
-  const [unitsCompleted, setUnitsCompleted] = useState('');
-  const [crewSize, setCrewSize] = useState('');
-  const [hoursWorked, setHoursWorked] = useState('');
   const [logDate, setLogDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
-  // Variables for this log — starts pre-populated from job defaults
   const [logVariables, setLogVariables] = useState<PendingVariable[]>([]);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [latitude, setLatitude] = useState<number | null>(null);
@@ -71,12 +85,8 @@ export default function NewLogScreen() {
           .order('name'),
       ]);
 
-    if (jobData) {
-      setJob(jobData);
-      if (jobData.crew_size) setCrewSize(String(jobData.crew_size));
-    }
+    if (jobData) setJob(jobData);
     if (taskData) setTasks(taskData);
-    // Pre-populate log variables from job defaults
     if (varData) setLogVariables(jobVariablesToPending(varData));
     if (memberData) setCrewMembers(memberData);
   }
@@ -100,79 +110,118 @@ export default function NewLogScreen() {
     setLocating(false);
   }
 
-  function toggleCrew(id: string) {
-    setSelectedCrewIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      // Keep crew size in sync with selected count
-      setCrewSize(String(next.size || (job?.crew_size ?? '')));
-      return next;
-    });
+  // ── Task entry helpers ──────────────────────────────────────
+
+  function updateEntry(localId: string, patch: Partial<Omit<TaskEntry, 'localId'>>) {
+    setTaskEntries(prev =>
+      prev.map(e => e.localId === localId ? { ...e, ...patch } : e)
+    );
   }
 
+  function toggleCrewForEntry(localId: string, memberId: string) {
+    setTaskEntries(prev =>
+      prev.map(e => {
+        if (e.localId !== localId) return e;
+        const next = new Set(e.crewIds);
+        if (next.has(memberId)) next.delete(memberId);
+        else next.add(memberId);
+        return { ...e, crewIds: next };
+      })
+    );
+  }
+
+  function addEntry() {
+    setTaskEntries(prev => [...prev, makeEntry()]);
+  }
+
+  function removeEntry(localId: string) {
+    setTaskEntries(prev => prev.filter(e => e.localId !== localId));
+  }
+
+  // ── Save ────────────────────────────────────────────────────
+
   async function handleSubmit() {
-    if (!unitsCompleted || isNaN(Number(unitsCompleted))) {
-      Alert.alert('Missing field', 'Enter how many units were completed today.');
-      return;
+    for (const entry of taskEntries) {
+      if (!entry.unitsCompleted || isNaN(Number(entry.unitsCompleted))) {
+        const label = entry.taskId
+          ? (tasks.find(t => t.id === entry.taskId)?.name ?? 'task')
+          : 'general work';
+        Alert.alert('Missing field', `Enter units completed for "${label}".`);
+        return;
+      }
     }
 
     setSubmitting(true);
 
-    // 1. Insert the daily log
-    const { data: newLog, error } = await supabase
-      .from('daily_logs')
-      .insert({
-        job_id: jobId,
-        logged_by: profile?.id,
-        log_date: logDate,
-        units_completed: Number(unitsCompleted),
-        task_id: selectedTaskId ?? null,
-        percent_complete: percentComplete ? Number(percentComplete) : null,
-        crew_size: crewSize ? Number(crewSize) : null,
-        hours_worked: hoursWorked ? Number(hoursWorked) : null,
-        weather_temp_f: weather?.temp_f ?? null,
-        weather_condition: weather?.condition ?? null,
-        weather_wind_mph: weather?.wind_mph ?? null,
-        weather_humidity: weather?.humidity ?? null,
-        weather_precip_in: weather?.precip_in ?? null,
-        log_latitude: latitude ?? null,
-        log_longitude: longitude ?? null,
-        notes: notes || null,
-      })
-      .select()
-      .single();
+    // Total crew = union across all entries
+    const allCrewIds = new Set(taskEntries.flatMap(e => [...e.crewIds]));
+    const totalCrewSize = allCrewIds.size || null;
 
-    if (error) {
-      setSubmitting(false);
-      if (error.code === '23505') {
-        Alert.alert('Already logged', 'A log for this date already exists. Delete it first to re-log.');
-      } else {
-        Alert.alert('Error', error.message);
+    for (let i = 0; i < taskEntries.length; i++) {
+      const entry = taskEntries[i];
+
+      const { data: newLog, error } = await supabase
+        .from('daily_logs')
+        .insert({
+          job_id: jobId,
+          logged_by: profile?.id,
+          log_date: logDate,
+          units_completed: Number(entry.unitsCompleted),
+          task_id: entry.taskId ?? null,
+          percent_complete: i === 0 && percentComplete ? Number(percentComplete) : null,
+          crew_size: totalCrewSize,
+          hours_worked: entry.hoursWorked ? Number(entry.hoursWorked) : null,
+          weather_temp_f: weather?.temp_f ?? null,
+          weather_condition: weather?.condition ?? null,
+          weather_wind_mph: weather?.wind_mph ?? null,
+          weather_humidity: weather?.humidity ?? null,
+          weather_precip_in: weather?.precip_in ?? null,
+          log_latitude: latitude ?? null,
+          log_longitude: longitude ?? null,
+          notes: i === 0 ? (notes || null) : null,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        setSubmitting(false);
+        if (error.code === '23505') {
+          const taskName = entry.taskId
+            ? (tasks.find(t => t.id === entry.taskId)?.name ?? 'that task')
+            : 'General';
+          Alert.alert(
+            'Already logged',
+            `"${taskName}" already has a log for this date. Remove it first to re-log.`
+          );
+        } else {
+          Alert.alert('Error saving log', error.message);
+        }
+        return;
       }
-      return;
-    }
 
-    if (newLog) {
-      // 2. Save variable overrides (all current log values — even if same as job default)
-      if (logVariables.length > 0) {
-        await supabase.from('log_variable_overrides').insert(
-          logVariables.map(v => ({
-            daily_log_id: newLog.id,
-            variable_type_id: v.variable_type_id,
-            value: v.value,
-          }))
-        );
-      }
+      if (newLog) {
+        // Save variable overrides on the first entry only
+        if (i === 0 && logVariables.length > 0) {
+          const { error: varErr } = await supabase.from('log_variable_overrides').insert(
+            logVariables.map(v => ({
+              daily_log_id: newLog.id,
+              variable_type_id: v.variable_type_id,
+              value: v.value,
+            }))
+          );
+          if (varErr) console.warn('Variable override error:', varErr.message);
+        }
 
-      // 3. Save crew assignments
-      if (selectedCrewIds.size > 0) {
-        await supabase.from('log_crew_assignments').insert(
-          Array.from(selectedCrewIds).map(memberId => ({
-            daily_log_id: newLog.id,
-            crew_member_id: memberId,
-          }))
-        );
+        // Save crew assignments for this entry's crew
+        if (entry.crewIds.size > 0) {
+          const { error: crewErr } = await supabase.from('log_crew_assignments').insert(
+            Array.from(entry.crewIds).map(memberId => ({
+              daily_log_id: newLog.id,
+              crew_member_id: memberId,
+            }))
+          );
+          if (crewErr) console.warn('Crew assignment error:', crewErr.message);
+        }
       }
     }
 
@@ -191,10 +240,11 @@ export default function NewLogScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Log Today</Text>
+        <Text style={styles.title}>Log Work</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
+
         {/* Job context */}
         {job && (
           <View style={styles.jobContext}>
@@ -211,7 +261,17 @@ export default function NewLogScreen() {
           </View>
         )}
 
-        {/* Weather auto-capture */}
+        {/* Date */}
+        <Text style={styles.label}>Date *</Text>
+        <TextInput
+          style={styles.input}
+          value={logDate}
+          onChangeText={setLogDate}
+          placeholder="YYYY-MM-DD"
+          placeholderTextColor={Colors.textMuted}
+        />
+
+        {/* Weather */}
         <View style={styles.weatherCard}>
           <Text style={styles.weatherTitle}>Weather & Location</Text>
           {locating ? (
@@ -244,175 +304,52 @@ export default function NewLogScreen() {
           )}
         </View>
 
-        <Text style={styles.sectionLabel}>LOG ENTRY</Text>
-
-        {/* Task selection */}
-        {tasks.length > 0 && (
-          <>
-            <Text style={styles.label}>Task worked on today</Text>
-            {tasks.some(t => t.total_units != null) && !selectedTaskId && (
-              <Text style={styles.taskWarning}>
-                This job tracks progress by task. Select a task so your units count toward job progress.
-              </Text>
-            )}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {[{ id: null, name: 'General / whole job' } as any, ...tasks].map(t => (
-                <TouchableOpacity
-                  key={t.id ?? 'general'}
-                  style={[
-                    styles.taskChip,
-                    selectedTaskId === t.id && styles.taskChipSelected,
-                  ]}
-                  onPress={() => setSelectedTaskId(t.id)}
-                >
-                  <Text style={[
-                    styles.taskChipText,
-                    selectedTaskId === t.id && styles.taskChipTextSelected,
-                  ]}>
-                    {t.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </>
-        )}
-
-        <Text style={styles.label}>Date *</Text>
-        <TextInput
-          style={styles.input}
-          value={logDate}
-          onChangeText={setLogDate}
-          placeholder="YYYY-MM-DD"
-          placeholderTextColor={Colors.textMuted}
-        />
-
-        {(() => {
-          const activeTask = tasks.find(t => t.id === selectedTaskId);
-          const unitLabel = activeTask?.unit
-            ? `${activeTask.unit.charAt(0).toUpperCase() + activeTask.unit.slice(1)} completed today *`
-            : job
-            ? `${job.unit.charAt(0).toUpperCase() + job.unit.slice(1)} completed today *`
-            : 'Units completed *';
-          const taskRemaining = activeTask?.total_units != null
-            ? ` (${activeTask.total_units} total for this task)`
-            : '';
-          return (
-            <>
-              <Text style={styles.label}>{unitLabel}</Text>
-              {taskRemaining ? (
-                <Text style={styles.hint}>{activeTask?.name}{taskRemaining}</Text>
-              ) : null}
-              <TextInput
-                style={styles.input}
-                value={unitsCompleted}
-                onChangeText={setUnitsCompleted}
-                placeholder={`e.g. ${snap?.avg_units_per_day?.toFixed(0) ?? '12'}`}
-                placeholderTextColor={Colors.textMuted}
-                keyboardType="numeric"
-              />
-            </>
-          );
-        })()}
-
-        {snap?.avg_units_per_day ? (
-          <Text style={styles.hint}>
-            Your average is {snap.avg_units_per_day.toFixed(1)} {job?.unit}/day
-          </Text>
-        ) : null}
-
-        {/* ── JOB CONDITIONS TODAY ───────────────────── */}
-        {/* Pre-filled from job defaults — change if conditions differ today */}
+        {/* Job conditions */}
         <Text style={styles.sectionLabel}>TODAY'S CONDITIONS</Text>
         <Text style={styles.hint}>
-          Pre-filled from job defaults. Change any that are different today
-          — row length, pile length, wire gauge, etc. This data powers your
-          benchmarks automatically.
+          Pre-filled from job defaults. Change any that are different today.
         </Text>
-
         <JobVariables
           tradeCategory={job?.task_types?.category ?? undefined}
           variables={logVariables}
           onChange={setLogVariables}
         />
 
-        {/* ── CREW ────────────────────────────────────── */}
-        <Text style={styles.sectionLabel}>CREW TODAY</Text>
+        {/* ── Task entries ─────────────────────────────────── */}
+        <Text style={styles.sectionLabel}>WORK LOGGED TODAY</Text>
         <Text style={styles.hint}>
-          Tag who was on site. Builds per-person productivity data over time.
+          Add one entry per task or phase worked. Assign the crew for each.
         </Text>
 
-        {crewMembers.length === 0 ? (
-          <Text style={styles.noCrewText}>
-            No crew members added yet. Add them in Settings → Crew.
-          </Text>
-        ) : (
-          <View style={styles.crewGrid}>
-            {crewMembers.map(member => {
-              const selected = selectedCrewIds.has(member.id);
-              return (
-                <TouchableOpacity
-                  key={member.id}
-                  style={[styles.crewChip, selected && styles.crewChipSelected]}
-                  onPress={() => toggleCrew(member.id)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.crewInitial, selected && styles.crewInitialSelected]}>
-                    {member.name.charAt(0).toUpperCase()}
-                  </Text>
-                  <Text style={[styles.crewName, selected && styles.crewNameSelected]}>
-                    {member.name}
-                  </Text>
-                  {member.trade ? (
-                    <Text style={[styles.crewTrade, selected && styles.crewTradeSelected]}>
-                      {member.trade}
-                    </Text>
-                  ) : null}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
+        {taskEntries.map((entry, index) => (
+          <TaskEntryCard
+            key={entry.localId}
+            entry={entry}
+            index={index}
+            tasks={tasks}
+            crewMembers={crewMembers}
+            job={job}
+            snap={snap}
+            canRemove={taskEntries.length > 1}
+            onUpdateEntry={(patch) => updateEntry(entry.localId, patch)}
+            onToggleCrew={(memberId) => toggleCrewForEntry(entry.localId, memberId)}
+            onRemove={() => removeEntry(entry.localId)}
+          />
+        ))}
 
-        {selectedCrewIds.size > 0 && (
-          <Text style={styles.crewCount}>
-            {selectedCrewIds.size} crew member{selectedCrewIds.size !== 1 ? 's' : ''} selected
-          </Text>
-        )}
+        <TouchableOpacity style={styles.addTaskBtn} onPress={addEntry}>
+          <Text style={styles.addTaskText}>+ Add another task</Text>
+        </TouchableOpacity>
 
-        {/* ── NUMBERS ─────────────────────────────────── */}
+        {/* ── Shared details ───────────────────────────────── */}
         <Text style={styles.sectionLabel}>DETAILS</Text>
-
-        <Text style={styles.label}>Crew size today</Text>
-        <TextInput
-          style={styles.input}
-          value={crewSize}
-          onChangeText={setCrewSize}
-          placeholder="e.g. 4"
-          placeholderTextColor={Colors.textMuted}
-          keyboardType="numeric"
-        />
-        {selectedCrewIds.size > 0 && (
-          <Text style={styles.hint}>
-            Auto-filled from tagged crew. Adjust if others were on site too.
-          </Text>
-        )}
-
-        <Text style={styles.label}>Total crew hours worked</Text>
-        <TextInput
-          style={styles.input}
-          value={hoursWorked}
-          onChangeText={setHoursWorked}
-          placeholder="e.g. 32  (4 crew × 8 hrs)"
-          placeholderTextColor={Colors.textMuted}
-          keyboardType="numeric"
-        />
 
         <Text style={styles.label}>Foreman's % complete estimate (optional)</Text>
         <TextInput
           style={styles.input}
           value={percentComplete}
           onChangeText={setPercentComplete}
-          placeholder="e.g. 40  (gut feel on how far along this task is)"
+          placeholder="e.g. 45  (gut feel on overall job progress)"
           placeholderTextColor={Colors.textMuted}
           keyboardType="numeric"
         />
@@ -442,6 +379,143 @@ export default function NewLogScreen() {
   );
 }
 
+// ── TaskEntryCard ───────────────────────────────────────────────
+
+type TaskEntryCardProps = {
+  entry: TaskEntry;
+  index: number;
+  tasks: Task[];
+  crewMembers: CrewMember[];
+  job: Job | null;
+  snap: any;
+  canRemove: boolean;
+  onUpdateEntry: (patch: Partial<Omit<TaskEntry, 'localId'>>) => void;
+  onToggleCrew: (memberId: string) => void;
+  onRemove: () => void;
+};
+
+function TaskEntryCard({
+  entry, index, tasks, crewMembers, job, snap,
+  canRemove, onUpdateEntry, onToggleCrew, onRemove,
+}: TaskEntryCardProps) {
+  const activeTask = tasks.find(t => t.id === entry.taskId);
+  const unitLabel = activeTask?.unit
+    ? `${activeTask.unit.charAt(0).toUpperCase() + activeTask.unit.slice(1)} completed *`
+    : job
+    ? `${job.unit.charAt(0).toUpperCase() + job.unit.slice(1)} completed *`
+    : 'Units completed *';
+
+  return (
+    <View style={cardStyles.card}>
+      <View style={cardStyles.cardHeader}>
+        <Text style={cardStyles.cardTitle}>Task {index + 1}</Text>
+        {canRemove && (
+          <TouchableOpacity onPress={onRemove} style={cardStyles.removeBtn}>
+            <Text style={cardStyles.removeText}>Remove</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Task selector */}
+      {tasks.length > 0 && (
+        <>
+          <Text style={cardStyles.label}>Task worked on</Text>
+          {tasks.some(t => t.total_units != null) && !entry.taskId && (
+            <Text style={cardStyles.taskWarning}>
+              Select a task so units count toward job progress.
+            </Text>
+          )}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={cardStyles.chipScroll}>
+            {[{ id: null, name: 'General / whole job' } as any, ...tasks].map(t => (
+              <TouchableOpacity
+                key={t.id ?? 'general'}
+                style={[
+                  cardStyles.taskChip,
+                  entry.taskId === t.id && cardStyles.taskChipSelected,
+                ]}
+                onPress={() => onUpdateEntry({ taskId: t.id })}
+              >
+                <Text style={[
+                  cardStyles.taskChipText,
+                  entry.taskId === t.id && cardStyles.taskChipTextSelected,
+                ]}>
+                  {t.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </>
+      )}
+
+      {/* Units completed */}
+      <Text style={cardStyles.label}>{unitLabel}</Text>
+      {activeTask?.total_units != null && (
+        <Text style={cardStyles.hint}>
+          {activeTask.name} — {activeTask.total_units} total units for this task
+        </Text>
+      )}
+      <TextInput
+        style={cardStyles.input}
+        value={entry.unitsCompleted}
+        onChangeText={val => onUpdateEntry({ unitsCompleted: val })}
+        placeholder={`e.g. ${snap?.avg_units_per_day?.toFixed(0) ?? '12'}`}
+        placeholderTextColor={Colors.textMuted}
+        keyboardType="numeric"
+      />
+
+      {/* Crew for this task */}
+      <Text style={cardStyles.label}>Crew on this task</Text>
+      {crewMembers.length === 0 ? (
+        <Text style={cardStyles.noCrewText}>
+          No crew members added yet. Add them in Settings → Crew.
+        </Text>
+      ) : (
+        <View style={cardStyles.crewGrid}>
+          {crewMembers.map(member => {
+            const selected = entry.crewIds.has(member.id);
+            return (
+              <TouchableOpacity
+                key={member.id}
+                style={[cardStyles.crewChip, selected && cardStyles.crewChipSelected]}
+                onPress={() => onToggleCrew(member.id)}
+                activeOpacity={0.7}
+              >
+                <Text style={[cardStyles.crewInitial, selected && cardStyles.crewInitialSelected]}>
+                  {member.name.charAt(0).toUpperCase()}
+                </Text>
+                <Text style={[cardStyles.crewName, selected && cardStyles.crewNameSelected]}>
+                  {member.name}
+                </Text>
+                {member.trade ? (
+                  <Text style={[cardStyles.crewTrade, selected && cardStyles.crewTradeSelected]}>
+                    {member.trade}
+                  </Text>
+                ) : null}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+      {entry.crewIds.size > 0 && (
+        <Text style={cardStyles.crewCount}>
+          {entry.crewIds.size} crew member{entry.crewIds.size !== 1 ? 's' : ''} on this task
+        </Text>
+      )}
+
+      {/* Hours for this task */}
+      <Text style={cardStyles.label}>Hours worked on this task</Text>
+      <TextInput
+        style={cardStyles.input}
+        value={entry.hoursWorked}
+        onChangeText={val => onUpdateEntry({ hoursWorked: val })}
+        placeholder="e.g. 32  (4 crew × 8 hrs)"
+        placeholderTextColor={Colors.textMuted}
+        keyboardType="numeric"
+      />
+    </View>
+  );
+}
+
 function WeatherStat({ label, value }: { label: string; value: string }) {
   return (
     <View style={wStyles.stat}>
@@ -455,6 +529,54 @@ const wStyles = StyleSheet.create({
   stat: { alignItems: 'center', minWidth: 70 },
   value: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary },
   label: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
+});
+
+const cardStyles = StyleSheet.create({
+  card: {
+    backgroundColor: Colors.bgCard, borderRadius: 16,
+    padding: 16, gap: 10, borderWidth: 1, borderColor: Colors.border,
+  },
+  cardHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+  },
+  cardTitle: { fontSize: 14, fontWeight: '800', color: Colors.primary, letterSpacing: 0.5 },
+  removeBtn: { padding: 4 },
+  removeText: { color: Colors.textMuted, fontSize: 13, fontWeight: '600' },
+  label: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600', marginBottom: -4 },
+  hint: { color: Colors.textMuted, fontSize: 12, marginTop: -2, lineHeight: 18 },
+  taskWarning: { color: '#f59e0b', fontSize: 12, lineHeight: 18 },
+  chipScroll: { flexGrow: 0 },
+  taskChip: {
+    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
+    backgroundColor: Colors.bgInput, borderWidth: 1, borderColor: Colors.border,
+    marginRight: 8,
+  },
+  taskChipSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  taskChipText: { color: Colors.textSecondary, fontWeight: '600', fontSize: 13 },
+  taskChipTextSelected: { color: '#fff' },
+  input: {
+    backgroundColor: Colors.bgInput, borderRadius: 12, padding: 16,
+    color: Colors.textPrimary, fontSize: 16, borderWidth: 1, borderColor: Colors.border,
+  },
+  noCrewText: { color: Colors.textMuted, fontSize: 13, fontStyle: 'italic' },
+  crewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  crewChip: {
+    alignItems: 'center', gap: 4, padding: 12, borderRadius: 14,
+    backgroundColor: Colors.bgInput, borderWidth: 1, borderColor: Colors.border,
+    minWidth: 80,
+  },
+  crewChipSelected: { backgroundColor: Colors.primary + '22', borderColor: Colors.primary },
+  crewInitial: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: Colors.bgCard, textAlign: 'center', lineHeight: 40,
+    fontSize: 18, fontWeight: '800', color: Colors.textSecondary,
+  },
+  crewInitialSelected: { backgroundColor: Colors.primary, color: '#fff' },
+  crewName: { fontSize: 12, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center' },
+  crewNameSelected: { color: Colors.primary },
+  crewTrade: { fontSize: 10, color: Colors.textMuted, textAlign: 'center' },
+  crewTradeSelected: { color: Colors.primary + 'aa' },
+  crewCount: { fontSize: 13, color: Colors.primary, fontWeight: '600', marginTop: -4 },
 });
 
 const styles = StyleSheet.create({
@@ -492,21 +614,6 @@ const styles = StyleSheet.create({
   weatherGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   coordsText: { fontSize: 11, color: Colors.textMuted },
 
-  taskWarning: {
-    color: Colors.warning ?? '#f59e0b',
-    fontSize: 12,
-    lineHeight: 18,
-    marginBottom: 4,
-  },
-  taskChip: {
-    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
-    backgroundColor: Colors.bgCard, borderWidth: 1, borderColor: Colors.border,
-    marginRight: 8,
-  },
-  taskChipSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  taskChipText: { color: Colors.textSecondary, fontWeight: '600', fontSize: 13 },
-  taskChipTextSelected: { color: '#fff' },
-
   sectionLabel: {
     color: Colors.textMuted, fontSize: 11, fontWeight: '700',
     letterSpacing: 1.2, marginTop: 8, marginBottom: -2,
@@ -519,29 +626,11 @@ const styles = StyleSheet.create({
   },
   textarea: { minHeight: 80, textAlignVertical: 'top' },
 
-  // Crew tagger
-  noCrewText: { color: Colors.textMuted, fontSize: 13, fontStyle: 'italic' },
-  crewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  crewChip: {
-    alignItems: 'center', gap: 4, padding: 12, borderRadius: 14,
-    backgroundColor: Colors.bgCard, borderWidth: 1, borderColor: Colors.border,
-    minWidth: 80,
+  addTaskBtn: {
+    borderRadius: 12, padding: 14, alignItems: 'center',
+    borderWidth: 1.5, borderColor: Colors.primary, borderStyle: 'dashed',
   },
-  crewChipSelected: {
-    backgroundColor: Colors.primary + '22',
-    borderColor: Colors.primary,
-  },
-  crewInitial: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: Colors.bgInput, textAlign: 'center', lineHeight: 40,
-    fontSize: 18, fontWeight: '800', color: Colors.textSecondary,
-  },
-  crewInitialSelected: { backgroundColor: Colors.primary, color: '#fff' },
-  crewName: { fontSize: 12, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center' },
-  crewNameSelected: { color: Colors.primary },
-  crewTrade: { fontSize: 10, color: Colors.textMuted, textAlign: 'center' },
-  crewTradeSelected: { color: Colors.primary + 'aa' },
-  crewCount: { fontSize: 13, color: Colors.primary, fontWeight: '600', marginTop: -4 },
+  addTaskText: { color: Colors.primary, fontWeight: '700', fontSize: 14 },
 
   submitBtn: {
     backgroundColor: Colors.primary, borderRadius: 12,
