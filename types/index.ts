@@ -200,6 +200,18 @@ export interface JobVariable {
   job_variable_types?: JobVariableType;
 }
 
+/** A variable value assigned to a specific task */
+export interface TaskVariable {
+  id: string;
+  task_id: string;
+  variable_type_id: string;
+  value: string;
+  created_at: string;
+  updated_at: string;
+  // joined
+  job_variable_types?: JobVariableType;
+}
+
 /** A per-log override when conditions change mid-job */
 export interface LogVariableOverride {
   id: string;

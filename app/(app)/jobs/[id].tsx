@@ -5,9 +5,10 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
-import { Job, DailyLog, Task, JobVariable, getPaceColor, getForecastSentence } from '../../../types';
+import { Job, DailyLog, Task, JobVariable, TaskVariable, getPaceColor, getForecastSentence } from '../../../types';
 import { Colors } from '../../../constants/Colors';
 import JobVariables, { jobVariablesToPending } from '../../../components/JobVariables';
+import TaskVariables from '../../../components/TaskVariables';
 
 export default function JobDetailScreen() {
   const router = useRouter();
@@ -57,6 +58,7 @@ export default function JobDetailScreen() {
   const [editNotes, setEditNotes] = useState('');
   const [editLocationName, setEditLocationName] = useState('');
   const [editSaving, setEditSaving] = useState(false);
+  const [taskVars, setTaskVars] = useState<Record<string, TaskVariable[]>>({});
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
@@ -77,7 +79,7 @@ export default function JobDetailScreen() {
           .order('log_date', { ascending: false }),
         supabase
           .from('tasks')
-          .select('*')
+          .select('*, task_variables(*, job_variable_types(*))')
           .eq('job_id', id)
           .order('sequence_order'),
         supabase
@@ -88,7 +90,17 @@ export default function JobDetailScreen() {
       ]);
     if (jobData) setJob(jobData);
     if (logData) setLogs(logData);
-    if (taskData) setTasks(taskData);
+    if (taskData) {
+      setTasks(taskData);
+      const grouped = (taskData as (Task & { task_variables?: TaskVariable[] })[]).reduce(
+        (acc, t) => {
+          if (t.task_variables?.length) acc[t.id] = t.task_variables;
+          return acc;
+        },
+        {} as Record<string, TaskVariable[]>
+      );
+      setTaskVars(grouped);
+    }
     if (varData) setJobVars(varData);
     setLoading(false);
   }
@@ -518,6 +530,18 @@ export default function JobDetailScreen() {
                     ) : task.estimated_hours != null ? (
                       <Text style={styles.taskMeta}>{task.estimated_hours} hrs estimated</Text>
                     ) : null}
+                    {(taskVars[task.id]?.length ?? 0) > 0 && (
+                      <View style={styles.taskVarChips}>
+                        {taskVars[task.id].map((v) => (
+                          <View key={v.id} style={styles.taskVarChip}>
+                            <Text style={styles.taskVarChipLabel}>
+                              {v.job_variable_types?.name ?? ''}:
+                            </Text>
+                            <Text style={styles.taskVarChipValue}> {v.value}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
                   </View>
                   <Text style={[
                     styles.taskStatus,
@@ -746,6 +770,18 @@ export default function JobDetailScreen() {
               placeholderTextColor={Colors.textMuted}
               keyboardType="numeric"
             />
+
+            <Text style={[styles.editLabel, { marginTop: 16 }]}>Variables</Text>
+            <Text style={styles.editHint}>
+              Track conditions specific to this task — wire gauge, material type, equipment used, etc.
+            </Text>
+            {editingTask && (
+              <TaskVariables
+                taskId={editingTask.id}
+                tradeCategory={job?.task_types?.category}
+              />
+            )}
+
             <View style={styles.modalBtns}>
               <TouchableOpacity
                 style={styles.modalCancel}
@@ -998,6 +1034,15 @@ const styles = StyleSheet.create({
   taskActionBtn: { padding: 6 },
   taskActionEdit: { fontSize: 15, color: Colors.textSecondary },
   taskActionDelete: { fontSize: 13, color: Colors.danger },
+  taskVarChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
+  taskVarChip: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: Colors.bgInput, borderRadius: 10,
+    borderWidth: 1, borderColor: Colors.border,
+    paddingHorizontal: 6, paddingVertical: 2,
+  },
+  taskVarChipLabel: { color: Colors.textMuted, fontSize: 10 },
+  taskVarChipValue: { color: Colors.textSecondary, fontSize: 10, fontWeight: '600' },
   taskProgressRow: { gap: 3, marginTop: 4 },
   taskProgressBg: { height: 4, borderRadius: 2, backgroundColor: Colors.bgInput, overflow: 'hidden' },
   taskProgressFill: { height: '100%', borderRadius: 2 },
