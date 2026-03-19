@@ -45,6 +45,41 @@ export async function fetchWeather(
   }
 }
 
+export async function fetchHistoricalWeather(
+  latitude: number,
+  longitude: number,
+  date: string, // YYYY-MM-DD
+): Promise<WeatherData | null> {
+  try {
+    const url =
+      `https://archive-api.open-meteo.com/v1/archive` +
+      `?latitude=${latitude}&longitude=${longitude}` +
+      `&start_date=${date}&end_date=${date}` +
+      `&daily=temperature_2m_max,weathercode,windspeed_10m_max,precipitation_sum` +
+      `&hourly=relativehumidity_2m` +
+      `&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch` +
+      `&timezone=auto`;
+
+    const res = await fetch(url);
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const daily = data.daily;
+    // Use noon humidity as a representative daily value
+    const humidity = data.hourly?.relativehumidity_2m?.[12] ?? null;
+
+    return {
+      temp_f: Math.round(daily.temperature_2m_max[0]),
+      condition: wmoToCondition(daily.weathercode[0]),
+      wind_mph: Math.round(daily.windspeed_10m_max[0]),
+      humidity: humidity !== null ? Math.round(humidity) : 0,
+      precip_in: daily.precipitation_sum[0] ?? 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // Reverse geocode using Open-Meteo's companion geocoder (nominatim fallback)
 export async function reverseGeocode(
   latitude: number,
