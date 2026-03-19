@@ -477,28 +477,10 @@ export default function JobDetailScreen() {
             </Text>
           ) : (
             tasks.map((task, idx) => {
-              const webDragProps = Platform.OS === 'web' ? {
-                draggable: true,
-                onDragStart: () => setDragIndex(idx),
-                onDragOver: (e: any) => { e.preventDefault(); setDragOverIndex(idx); },
-                onDrop: (e: any) => {
-                  e.preventDefault();
-                  if (dragIndex !== null && dragIndex !== idx) reorderTask(dragIndex, idx);
-                  setDragIndex(null);
-                  setDragOverIndex(null);
-                },
-                onDragEnd: () => { setDragIndex(null); setDragOverIndex(null); },
-              } : {};
-              return (
-                <View
-                  key={task.id}
-                  style={[
-                    styles.taskRow,
-                    dragOverIndex === idx && dragIndex !== idx && styles.taskRowDragOver,
-                    dragIndex === idx && styles.taskRowDragging,
-                  ]}
-                  {...(webDragProps as any)}
-                >
+              const isDragging = dragIndex === idx;
+              const isDragOver = dragOverIndex === idx && dragIndex !== idx;
+              const taskContent = (
+                <>
                   <Text style={[styles.dragHandle, Platform.OS === 'web' && { cursor: 'grab' } as any]}>≡</Text>
                   <TouchableOpacity
                     onPress={() => toggleTaskStatus(task)}
@@ -568,6 +550,49 @@ export default function JobDetailScreen() {
                       </TouchableOpacity>
                     </View>
                   )}
+                </>
+              );
+              if (Platform.OS === 'web') {
+                return (
+                  <div
+                    key={task.id}
+                    draggable
+                    onDragStart={(e: any) => { e.dataTransfer.effectAllowed = 'move'; setDragIndex(idx); }}
+                    onDragOver={(e: any) => { e.preventDefault(); setDragOverIndex(idx); }}
+                    onDrop={(e: any) => {
+                      e.preventDefault();
+                      if (dragIndex !== null && dragIndex !== idx) reorderTask(dragIndex, idx);
+                      setDragIndex(null);
+                      setDragOverIndex(null);
+                    }}
+                    onDragEnd={() => { setDragIndex(null); setDragOverIndex(null); }}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: '12px',
+                      paddingTop: '12px',
+                      paddingBottom: '12px',
+                      borderBottom: '1px solid #334155',
+                      cursor: 'grab',
+                      opacity: isDragging ? 0.4 : 1,
+                      ...(isDragOver ? { borderTop: '2px solid #f97316' } : {}),
+                    } as any}
+                  >
+                    {taskContent}
+                  </div>
+                );
+              }
+              return (
+                <View
+                  key={task.id}
+                  style={[
+                    styles.taskRow,
+                    isDragOver && styles.taskRowDragOver,
+                    isDragging && styles.taskRowDragging,
+                  ]}
+                >
+                  {taskContent}
                 </View>
               );
             })
