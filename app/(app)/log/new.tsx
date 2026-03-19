@@ -9,7 +9,7 @@ import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../hooks/useAuth';
 import { Job, Task, WeatherData, CrewMember } from '../../../types';
 import { Colors } from '../../../constants/Colors';
-import { fetchWeather, fetchHistoricalWeather } from '../../../lib/weather';
+import { fetchWeather } from '../../../lib/weather';
 import JobVariables, { PendingVariable, jobVariablesToPending } from '../../../components/JobVariables';
 
 export default function NewLogScreen() {
@@ -37,16 +37,12 @@ export default function NewLogScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (jobId) fetchJob();
-    captureLocation();
-  }, [jobId]);
+    if (jobId && profile?.company_id) fetchJob();
+  }, [jobId, profile?.company_id]);
 
-  // Re-fetch weather whenever date or location changes
   useEffect(() => {
-    if (latitude !== null && longitude !== null) {
-      fetchWeatherForDate(latitude, longitude, logDate);
-    }
-  }, [latitude, longitude, logDate]);
+    autoCapture();
+  }, []);
 
   async function fetchJob() {
     const [{ data: jobData }, { data: taskData }, { data: varData }, { data: memberData }] =
@@ -85,7 +81,7 @@ export default function NewLogScreen() {
     if (memberData) setCrewMembers(memberData);
   }
 
-  async function captureLocation() {
+  async function autoCapture() {
     setLocating(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -95,20 +91,12 @@ export default function NewLogScreen() {
       const { latitude: lat, longitude: lng } = loc.coords;
       setLatitude(lat);
       setLongitude(lng);
-      // weather fetch is triggered by the useEffect on [latitude, longitude, logDate]
+
+      const w = await fetchWeather(lat, lng);
+      if (w) setWeather(w);
     } catch {
       // Silent fail — weather/location is enhancement, not blocker
     }
-    setLocating(false);
-  }
-
-  async function fetchWeatherForDate(lat: number, lng: number, date: string) {
-    setLocating(true);
-    const today = new Date().toISOString().split('T')[0];
-    const w = date === today
-      ? await fetchWeather(lat, lng)
-      : await fetchHistoricalWeather(lat, lng, date);
-    if (w) setWeather(w);
     setLocating(false);
   }
 
@@ -203,7 +191,7 @@ export default function NewLogScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Log Work</Text>
+        <Text style={styles.title}>Log Today</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
@@ -244,7 +232,7 @@ export default function NewLogScreen() {
           ) : (
             <View style={styles.weatherRow}>
               <Text style={styles.weatherMissed}>Could not capture automatically.</Text>
-              <TouchableOpacity onPress={captureLocation} style={styles.retryBtn}>
+              <TouchableOpacity onPress={autoCapture} style={styles.retryBtn}>
                 <Text style={styles.retryText}>Retry</Text>
               </TouchableOpacity>
             </View>
