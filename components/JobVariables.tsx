@@ -9,7 +9,7 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Modal, FlatList,
+  ScrollView, ActivityIndicator, Modal, Alert,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { Colors } from '../constants/Colors';
@@ -50,29 +50,32 @@ export default function JobVariables({
   const [editingType, setEditingType] = useState<JobVariableType | null>(null);
   const [valueInput, setValueInput] = useState('');
 
-  // Load variable type catalog
-  useEffect(() => {
-    (async () => {
-      let query = supabase
-        .from('job_variable_types')
-        .select('*')
-        .order('name');
+  // Create new type state
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newTypeName, setNewTypeName] = useState('');
+  const [newTypeUnitHint, setNewTypeUnitHint] = useState('');
+  const [newTypeDesc, setNewTypeDesc] = useState('');
+  const [creatingType, setCreatingType] = useState(false);
 
-      // Show global + company types; filter by category if provided
-      // (category = null in DB means the type applies to all trades)
-      const { data } = await query;
-      if (data) {
-        const filtered = tradeCategory
-          ? data.filter(
-              (t: JobVariableType) =>
-                t.category === tradeCategory || t.category == null
-            )
-          : data;
-        setTypes(filtered);
-      }
-      setLoading(false);
-    })();
-  }, [tradeCategory]);
+  // Load variable type catalog
+  async function loadTypes() {
+    const { data } = await supabase
+      .from('job_variable_types')
+      .select('*')
+      .order('name');
+    if (data) {
+      const filtered = tradeCategory
+        ? data.filter(
+            (t: JobVariableType) =>
+              t.category === tradeCategory || t.category == null
+          )
+        : data;
+      setTypes(filtered);
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => { loadTypes(); }, [tradeCategory]);
 
   // Types not yet added to this job
   const unusedTypes = types.filter(
@@ -101,6 +104,59 @@ export default function JobVariables({
     onChange?.(updated);
     setEditingType(null);
     setValueInput('');
+  }
+
+  async function createVariableType() {
+    if (!newTypeName.trim()) return;
+    setCreatingType(true);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setCreatingType(false); return; }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile?.company_id) {
+      Alert.alert('Error', 'Could not find your company.');
+      setCreatingType(false);
+      return;
+    }
+
+    const { data: newType, error } = await supabase
+      .from('job_variable_types')
+      .insert({
+        name: newTypeName.trim(),
+        description: newTypeDesc.trim() || null,
+        unit_hint: newTypeUnitHint.trim() || null,
+        category: tradeCategory ?? null,
+        common_values: [],
+        is_global: false,
+        company_id: profile.company_id,
+        created_by: user.id,
+      })
+      .select()
+      .single();
+
+    setCreatingType(false);
+
+    if (error) {
+      Alert.alert('Error', error.message);
+      return;
+    }
+
+    await loadTypes();
+    setCreateOpen(false);
+    setNewTypeName('');
+    setNewTypeUnitHint('');
+    setNewTypeDesc('');
+
+    // Immediately open the value input for the new type
+    if (newType) {
+      openPicker(newType as JobVariableType);
+    }
   }
 
   function removeVariable(typeId: string) {
@@ -197,19 +253,20 @@ export default function JobVariables({
             </TouchableOpacity>
           </View>
 
-          {unusedTypes.length === 0 ? (
-            <View style={styles.emptyState}>
+          {/* ScrollView instead of FlatList so the footer always renders on web */}
+          <ScrollView
+            contentContainerStyle={styles.pickerList}
+            keyboardShouldPersistTaps="handled"
+          >
+            {unusedTypes.length === 0 && (
               <Text style={styles.emptyText}>
                 All available variables have been added.
               </Text>
-            </View>
-          ) : (
-            <FlatList
-              data={unusedTypes}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={{ padding: 16 }}
-              ItemSeparatorComponent={() => <View style={styles.separator} />}
-              renderItem={({ item }) => (
+            )}
+
+            {unusedTypes.map((item, idx) => (
+              <View key={item.id}>
+                {idx > 0 && <View style={styles.separator} />}
                 <TouchableOpacity
                   style={styles.typeRow}
                   onPress={() => openPicker(item)}
@@ -222,12 +279,30 @@ export default function JobVariables({
                     {item.category ? (
                       <Text style={styles.typeCategory}>{item.category}</Text>
                     ) : null}
+                    {!item.is_global && (
+                      <Text style={styles.typeCustomBadge}>Custom</Text>
+                    )}
                   </View>
                   <Text style={styles.typeArrow}>›</Text>
                 </TouchableOpacity>
-              )}
-            />
-          )}
+              </View>
+            ))}
+
+            {/* Always-visible "Create new" button at the bottom */}
+            <View style={styles.separator} />
+            <TouchableOpacity
+              style={styles.createNewBtn}
+              onPress={() => {
+                setPickerOpen(false);
+                setCreateOpen(true);
+              }}
+            >
+              <Text style={styles.createNewBtnText}>+ Create new variable type</Text>
+              <Text style={styles.createNewSubtext}>
+                Saved to your company and available to your whole team
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
       </Modal>
 
@@ -317,6 +392,76 @@ export default function JobVariables({
           </View>
         )}
       </Modal>
+
+      {/* CREATE NEW VARIABLE TYPE modal */}
+      <Modal
+        visible={createOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setCreateOpen(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>New variable type</Text>
+            <TouchableOpacity onPress={() => setCreateOpen(false)}>
+              <Text style={styles.modalClose}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            contentContainerStyle={styles.valueSheet}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Text style={styles.createInfoText}>
+              This variable type will be saved to your company and available to
+              everyone on your team — on any task or job.
+            </Text>
+
+            <Text style={styles.label}>Name *</Text>
+            <TextInput
+              style={styles.input}
+              value={newTypeName}
+              onChangeText={setNewTypeName}
+              placeholder="e.g. Bolt pattern, Pipe schedule, Panel brand"
+              placeholderTextColor={Colors.textMuted}
+              autoFocus
+            />
+
+            <Text style={styles.label}>Unit hint (optional)</Text>
+            <TextInput
+              style={styles.input}
+              value={newTypeUnitHint}
+              onChangeText={setNewTypeUnitHint}
+              placeholder="e.g. AWG, inches, tons"
+              placeholderTextColor={Colors.textMuted}
+              autoCapitalize="none"
+            />
+
+            <Text style={styles.label}>Description (optional)</Text>
+            <TextInput
+              style={[styles.input, { minHeight: 60, textAlignVertical: 'top' }]}
+              value={newTypeDesc}
+              onChangeText={setNewTypeDesc}
+              placeholder="Brief description shown in the picker"
+              placeholderTextColor={Colors.textMuted}
+              multiline
+            />
+
+            <TouchableOpacity
+              style={[
+                styles.saveBtn,
+                (!newTypeName.trim() || creatingType) && styles.saveBtnDisabled,
+              ]}
+              onPress={createVariableType}
+              disabled={!newTypeName.trim() || creatingType}
+            >
+              <Text style={styles.saveBtnText}>
+                {creatingType ? 'Creating…' : 'Create & add value'}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -403,6 +548,7 @@ const styles = StyleSheet.create({
   modalClose: { color: Colors.primary, fontSize: 16, fontWeight: '600' },
 
   // Type picker list
+  pickerList: { padding: 16, paddingBottom: 48 },
   typeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -419,8 +565,40 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginTop: 3,
   },
+  typeCustomBadge: {
+    color: Colors.warning,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginTop: 3,
+  },
   typeArrow: { color: Colors.textMuted, fontSize: 20, marginLeft: 8 },
   separator: { height: 1, backgroundColor: Colors.border },
+  emptyText: { color: Colors.textMuted, fontSize: 14, textAlign: 'center', paddingVertical: 16 },
+
+  // Create new variable type button
+  createNewBtn: {
+    marginTop: 24,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    gap: 4,
+  },
+  createNewBtnText: { color: Colors.primary, fontWeight: '700', fontSize: 15 },
+  createNewSubtext: { color: Colors.textMuted, fontSize: 12, textAlign: 'center' },
+  createInfoText: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 8,
+    backgroundColor: Colors.bgInput,
+    borderRadius: 8,
+    padding: 12,
+  },
 
   // Value input sheet
   valueSheet: { padding: 20, gap: 12 },
@@ -461,9 +639,4 @@ const styles = StyleSheet.create({
   },
   saveBtnDisabled: { opacity: 0.4 },
   saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-
-  // Empty state
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  emptyText: { color: Colors.textMuted, textAlign: 'center', fontSize: 14 },
 });
-

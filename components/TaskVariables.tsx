@@ -11,7 +11,7 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Modal, FlatList, Alert,
+  ScrollView, ActivityIndicator, Modal, Alert,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { Colors } from '../constants/Colors';
@@ -255,53 +255,57 @@ export default function TaskVariables({ taskId, tradeCategory }: Props) {
             </TouchableOpacity>
           </View>
 
-          <FlatList
-            data={unusedTypes}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-            ListEmptyComponent={
+          {/* ScrollView instead of FlatList — ListFooterComponent is unreliable on web */}
+          <ScrollView
+            contentContainerStyle={styles.pickerList}
+            keyboardShouldPersistTaps="handled"
+          >
+            {unusedTypes.length === 0 && (
               <Text style={styles.emptyText}>
                 All available variables have been added.
               </Text>
-            }
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.typeRow}
-                onPress={() => openValueInput(item)}
-              >
-                <View style={styles.typeLeft}>
-                  <Text style={styles.typeName}>{item.name}</Text>
-                  {item.description ? (
-                    <Text style={styles.typeDesc}>{item.description}</Text>
-                  ) : null}
-                  {item.category ? (
-                    <Text style={styles.typeCategory}>{item.category}</Text>
-                  ) : null}
-                  {!item.is_global && (
-                    <Text style={styles.typeCustomBadge}>Custom</Text>
-                  )}
-                </View>
-                <Text style={styles.typeArrow}>›</Text>
-              </TouchableOpacity>
             )}
-            ListFooterComponent={
-              <TouchableOpacity
-                style={styles.createNewBtn}
-                onPress={() => {
-                  setPickerOpen(false);
-                  setCreateOpen(true);
-                }}
-              >
-                <Text style={styles.createNewBtnText}>
-                  + Create new variable type
-                </Text>
-                <Text style={styles.createNewSubtext}>
-                  Saved to your company and available to your whole team
-                </Text>
-              </TouchableOpacity>
-            }
-          />
+
+            {unusedTypes.map((item, idx) => (
+              <View key={item.id}>
+                {idx > 0 && <View style={styles.separator} />}
+                <TouchableOpacity
+                  style={styles.typeRow}
+                  onPress={() => openValueInput(item)}
+                >
+                  <View style={styles.typeLeft}>
+                    <Text style={styles.typeName}>{item.name}</Text>
+                    {item.description ? (
+                      <Text style={styles.typeDesc}>{item.description}</Text>
+                    ) : null}
+                    {item.category ? (
+                      <Text style={styles.typeCategory}>{item.category}</Text>
+                    ) : null}
+                    {!item.is_global && (
+                      <Text style={styles.typeCustomBadge}>Custom</Text>
+                    )}
+                  </View>
+                  <Text style={styles.typeArrow}>›</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+
+            <View style={styles.separator} />
+            <TouchableOpacity
+              style={styles.createNewBtn}
+              onPress={() => {
+                setPickerOpen(false);
+                setCreateOpen(true);
+              }}
+            >
+              <Text style={styles.createNewBtnText}>
+                + Create new variable type
+              </Text>
+              <Text style={styles.createNewSubtext}>
+                Saved to your company and available to your whole team
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
       </Modal>
 
@@ -542,6 +546,7 @@ const styles = StyleSheet.create({
   separator: { height: 1, backgroundColor: Colors.border },
   emptyText: { color: Colors.textMuted, fontSize: 14, textAlign: 'center', paddingVertical: 16 },
 
+  pickerList: { padding: 16, paddingBottom: 48 },
   createNewBtn: {
     marginTop: 24,
     borderWidth: 1,

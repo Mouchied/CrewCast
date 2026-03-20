@@ -49,6 +49,7 @@ export default function NewLogScreen() {
   const [longitude, setLongitude] = useState<number | null>(null);
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [entryErrors, setEntryErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (jobId && profile?.company_id) fetchJob();
@@ -138,19 +139,32 @@ export default function NewLogScreen() {
     setTaskEntries(prev => prev.filter(e => e.localId !== localId));
   }
 
+  function clearEntryError(localId: string) {
+    setEntryErrors(prev => {
+      if (!prev[localId]) return prev;
+      const next = { ...prev };
+      delete next[localId];
+      return next;
+    });
+  }
+
   // ── Save ────────────────────────────────────────────────────
 
   async function handleSubmit() {
+    const errors: Record<string, string> = {};
     for (const entry of taskEntries) {
       if (!entry.unitsCompleted || isNaN(Number(entry.unitsCompleted))) {
         const label = entry.taskId
           ? (tasks.find(t => t.id === entry.taskId)?.name ?? 'task')
           : 'general work';
-        Alert.alert('Missing field', `Enter units completed for "${label}".`);
-        return;
+        errors[entry.localId] = `Missing: units completed for "${label}"`;
       }
     }
-
+    if (Object.keys(errors).length > 0) {
+      setEntryErrors(errors);
+      return;
+    }
+    setEntryErrors({});
     setSubmitting(true);
 
     // Total crew = union across all entries
@@ -331,9 +345,11 @@ export default function NewLogScreen() {
             job={job}
             snap={snap}
             canRemove={taskEntries.length > 1}
+            error={entryErrors[entry.localId] ?? ''}
             onUpdateEntry={(patch) => updateEntry(entry.localId, patch)}
             onToggleCrew={(memberId) => toggleCrewForEntry(entry.localId, memberId)}
             onRemove={() => removeEntry(entry.localId)}
+            onClearError={() => clearEntryError(entry.localId)}
           />
         ))}
 
@@ -389,14 +405,16 @@ type TaskEntryCardProps = {
   job: Job | null;
   snap: any;
   canRemove: boolean;
+  error: string;
   onUpdateEntry: (patch: Partial<Omit<TaskEntry, 'localId'>>) => void;
   onToggleCrew: (memberId: string) => void;
   onRemove: () => void;
+  onClearError: () => void;
 };
 
 function TaskEntryCard({
   entry, index, tasks, crewMembers, job, snap,
-  canRemove, onUpdateEntry, onToggleCrew, onRemove,
+  canRemove, error, onUpdateEntry, onToggleCrew, onRemove, onClearError,
 }: TaskEntryCardProps) {
   const activeTask = tasks.find(t => t.id === entry.taskId);
   const unitLabel = activeTask?.unit
@@ -455,13 +473,14 @@ function TaskEntryCard({
         </Text>
       )}
       <TextInput
-        style={cardStyles.input}
+        style={[cardStyles.input, !!error && cardStyles.inputError]}
         value={entry.unitsCompleted}
-        onChangeText={val => onUpdateEntry({ unitsCompleted: val })}
+        onChangeText={val => { onUpdateEntry({ unitsCompleted: val }); onClearError(); }}
         placeholder={`e.g. ${snap?.avg_units_per_day?.toFixed(0) ?? '12'}`}
         placeholderTextColor={Colors.textMuted}
         keyboardType="numeric"
       />
+      {!!error && <Text style={cardStyles.errorText}>{error}</Text>}
 
       {/* Crew for this task */}
       <Text style={cardStyles.label}>Crew on this task</Text>
@@ -558,6 +577,8 @@ const cardStyles = StyleSheet.create({
     backgroundColor: Colors.bgInput, borderRadius: 12, padding: 16,
     color: Colors.textPrimary, fontSize: 16, borderWidth: 1, borderColor: Colors.border,
   },
+  inputError: { borderColor: '#ef4444' },
+  errorText: { color: '#ef4444', fontSize: 13, fontWeight: '600', marginTop: -4 },
   noCrewText: { color: Colors.textMuted, fontSize: 13, fontStyle: 'italic' },
   crewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   crewChip: {

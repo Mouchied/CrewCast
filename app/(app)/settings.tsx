@@ -26,6 +26,9 @@ export default function SettingsScreen() {
   const [newCrewName, setNewCrewName] = useState('');
   const [newCrewTrade, setNewCrewTrade] = useState('');
   const [addingCrew, setAddingCrew] = useState(false);
+  const [inviteError, setInviteError] = useState('');
+  const [taskTypeError, setTaskTypeError] = useState('');
+  const [crewError, setCrewError] = useState('');
 
   useEffect(() => { if (profile?.company_id) fetchData(); }, [profile]);
 
@@ -71,7 +74,9 @@ export default function SettingsScreen() {
   }
 
   async function sendInvite() {
-    if (!inviteEmail.trim() || !profile?.company_id) return;
+    if (!inviteEmail.trim()) { setInviteError('Missing: email address is required'); return; }
+    if (!profile?.company_id) return;
+    setInviteError('');
     setInviting(true);
 
     const { error } = await supabase.from('company_invitations').insert({
@@ -94,7 +99,9 @@ export default function SettingsScreen() {
   }
 
   async function addCustomTaskType() {
-    if (!newTaskName.trim() || !newTaskUnit.trim()) return;
+    if (!newTaskName.trim()) { setTaskTypeError('Missing: task name is required'); return; }
+    if (!newTaskUnit.trim()) { setTaskTypeError('Missing: unit of measure is required'); return; }
+    setTaskTypeError('');
     setAddingTask(true);
 
     const { error } = await supabase.from('task_types').insert({
@@ -115,7 +122,9 @@ export default function SettingsScreen() {
   }
 
   async function addCrewMember() {
-    if (!newCrewName.trim() || !profile?.company_id) return;
+    if (!newCrewName.trim()) { setCrewError('Missing: crew member name is required'); return; }
+    if (!profile?.company_id) return;
+    setCrewError('');
     setAddingCrew(true);
     const { error } = await supabase.from('crew_members').insert({
       company_id: profile.company_id,
@@ -275,7 +284,7 @@ export default function SettingsScreen() {
               <TextInput
                 style={styles.inviteInput}
                 value={inviteEmail}
-                onChangeText={setInviteEmail}
+                onChangeText={t => { setInviteEmail(t); setInviteError(''); }}
                 placeholder="foreman@company.com"
                 placeholderTextColor={Colors.textMuted}
                 keyboardType="email-address"
@@ -289,6 +298,7 @@ export default function SettingsScreen() {
                 <Text style={styles.inviteBtnText}>{inviting ? '…' : 'Invite'}</Text>
               </TouchableOpacity>
             </View>
+            {!!inviteError && <Text style={styles.inlineError}>{inviteError}</Text>}
           </View>
         </View>
 
@@ -316,17 +326,18 @@ export default function SettingsScreen() {
             <TextInput
               style={styles.input}
               value={newTaskName}
-              onChangeText={setNewTaskName}
+              onChangeText={t => { setNewTaskName(t); setTaskTypeError(''); }}
               placeholder="Task type name (e.g. String inverter installation)"
               placeholderTextColor={Colors.textMuted}
             />
             <TextInput
               style={styles.input}
               value={newTaskUnit}
-              onChangeText={setNewTaskUnit}
+              onChangeText={t => { setNewTaskUnit(t); setTaskTypeError(''); }}
               placeholder="Unit (e.g. inverters, feet, panels)"
               placeholderTextColor={Colors.textMuted}
             />
+            {!!taskTypeError && <Text style={styles.inlineError}>{taskTypeError}</Text>}
             <TouchableOpacity
               style={[styles.addBtn, addingTask && { opacity: 0.6 }]}
               onPress={addCustomTaskType}
@@ -378,7 +389,7 @@ export default function SettingsScreen() {
             <TextInput
               style={styles.input}
               value={newCrewName}
-              onChangeText={setNewCrewName}
+              onChangeText={t => { setNewCrewName(t); setCrewError(''); }}
               placeholder="Name (e.g. Bob Smith)"
               placeholderTextColor={Colors.textMuted}
             />
@@ -389,6 +400,7 @@ export default function SettingsScreen() {
               placeholder="Trade / specialty (e.g. electrician, roofer)"
               placeholderTextColor={Colors.textMuted}
             />
+            {!!crewError && <Text style={styles.inlineError}>{crewError}</Text>}
             <TouchableOpacity
               style={[styles.addBtn, addingCrew && { opacity: 0.6 }]}
               onPress={addCrewMember}
@@ -543,4 +555,9 @@ const styles = StyleSheet.create({
     borderRadius: 12, paddingVertical: 14, alignItems: 'center',
   },
   signOutText: { color: Colors.danger, fontWeight: '700', fontSize: 15 },
+  inlineError: {
+    color: '#ef4444', fontSize: 13, fontWeight: '600',
+    backgroundColor: '#ef444422', borderRadius: 8,
+    padding: 10, borderWidth: 1, borderColor: '#ef4444',
+  },
 });

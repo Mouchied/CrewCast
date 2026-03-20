@@ -58,6 +58,9 @@ export default function JobDetailScreen() {
   const [editNotes, setEditNotes] = useState('');
   const [editLocationName, setEditLocationName] = useState('');
   const [editSaving, setEditSaving] = useState(false);
+  const [editJobError, setEditJobError] = useState('');
+  const [editTaskError, setEditTaskError] = useState('');
+  const [addTaskError, setAddTaskError] = useState('');
   const [taskVars, setTaskVars] = useState<Record<string, TaskVariable[]>>({});
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -135,7 +138,7 @@ export default function JobDetailScreen() {
   }
 
   async function addTask() {
-    if (!newTaskName.trim()) return;
+    if (!newTaskName.trim()) { setAddTaskError('Missing: task name is required'); return; }
     const { error } = await supabase.from('tasks').insert({
       job_id: id,
       name: newTaskName.trim(),
@@ -151,6 +154,7 @@ export default function JobDetailScreen() {
       setNewTaskUnit('');
       setNewTaskTotalUnits('');
       setNewTaskStartingUnits('');
+      setAddTaskError('');
       setShowAddTask(false);
       fetchData();
     }
@@ -173,10 +177,11 @@ export default function JobDetailScreen() {
   }
 
   async function saveEditJob() {
-    if (!editName.trim()) { Alert.alert('Missing field', 'Job name is required.'); return; }
+    if (!editName.trim()) { setEditJobError('Missing: job name is required'); return; }
     if (!editTotalUnits || isNaN(Number(editTotalUnits))) {
-      Alert.alert('Missing field', 'Total units is required.'); return;
+      setEditJobError('Missing: total units is required (must be a number)'); return;
     }
+    setEditJobError('');
     setEditSaving(true);
     const { error } = await supabase.from('jobs').update({
       name: editName.trim(),
@@ -244,7 +249,7 @@ export default function JobDetailScreen() {
   }
 
   async function saveEditTask() {
-    if (!editingTask || !editTaskName.trim()) return;
+    if (!editingTask || !editTaskName.trim()) { setEditTaskError('Missing: task name is required'); return; }
     const { error } = await supabase.from('tasks').update({
       name: editTaskName.trim(),
       estimated_hours: editTaskHours ? Number(editTaskHours) : null,
@@ -253,6 +258,7 @@ export default function JobDetailScreen() {
       ...(editTaskStartingUnits ? { starting_units_completed: Number(editTaskStartingUnits) } : {}),
     }).eq('id', editingTask.id);
     if (!error) {
+      setEditTaskError('');
       setShowEditTask(false);
       setEditingTask(null);
       fetchData();
@@ -703,8 +709,9 @@ export default function JobDetailScreen() {
             <Text style={styles.editLabel}>Notes</Text>
             <TextInput style={[styles.modalInput, { minHeight: 70, textAlignVertical: 'top' }]} value={editNotes} onChangeText={setEditNotes} placeholderTextColor={Colors.textMuted} placeholder="Any notes…" multiline />
 
+            {!!editJobError && <Text style={styles.inlineError}>{editJobError}</Text>}
             <View style={styles.modalBtns}>
-              <TouchableOpacity style={styles.modalCancel} onPress={() => setShowEditJob(false)}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => { setShowEditJob(false); setEditJobError(''); }}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalSave, editSaving && { opacity: 0.6 }]} onPress={saveEditJob} disabled={editSaving}>
@@ -782,10 +789,11 @@ export default function JobDetailScreen() {
               />
             )}
 
+            {!!editTaskError && <Text style={styles.inlineError}>{editTaskError}</Text>}
             <View style={styles.modalBtns}>
               <TouchableOpacity
                 style={styles.modalCancel}
-                onPress={() => setShowEditTask(false)}
+                onPress={() => { setShowEditTask(false); setEditTaskError(''); }}
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
@@ -851,10 +859,11 @@ export default function JobDetailScreen() {
               placeholderTextColor={Colors.textMuted}
               keyboardType="numeric"
             />
+            {!!addTaskError && <Text style={styles.inlineError}>{addTaskError}</Text>}
             <View style={styles.modalBtns}>
               <TouchableOpacity
                 style={styles.modalCancel}
-                onPress={() => setShowAddTask(false)}
+                onPress={() => { setShowAddTask(false); setAddTaskError(''); }}
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
@@ -1085,4 +1094,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   modalSaveText: { color: '#fff', fontWeight: '700' },
+  inlineError: {
+    color: '#ef4444', fontSize: 13, fontWeight: '600',
+    backgroundColor: '#ef444422', borderRadius: 8,
+    padding: 10, borderWidth: 1, borderColor: '#ef4444',
+  },
 });

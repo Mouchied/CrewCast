@@ -36,6 +36,7 @@ export default function NewJobScreen() {
   const [longitude, setLongitude] = useState<number | null>(null);
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [formErrors, setFormErrors] = useState<string[]>([]);
   const [startingUnits, setStartingUnits] = useState('');
   const [startingHours, setStartingHours] = useState('');
   const [customTask, setCustomTask] = useState('');
@@ -84,10 +85,11 @@ export default function NewJobScreen() {
     if (!profile?.company_id) errors.push('• Account not fully set up — contact support');
 
     if (errors.length > 0) {
-      Alert.alert('Missing required fields', errors.join('\n'));
+      setFormErrors(errors);
       return;
     }
 
+    setFormErrors([]);
     setSubmitting(true);
 
     let taskTypeId = selectedTaskType?.id;
@@ -383,6 +385,14 @@ export default function NewJobScreen() {
           numberOfLines={3}
         />
 
+        {formErrors.length > 0 && (
+          <View style={styles.errorBox}>
+            {formErrors.map((e, i) => (
+              <Text key={i} style={styles.errorText}>{e}</Text>
+            ))}
+          </View>
+        )}
+
         <TouchableOpacity
           style={[styles.submitBtn, submitting && styles.submitDisabled]}
           onPress={handleSubmit}
@@ -453,4 +463,10 @@ const styles = StyleSheet.create({
   },
   submitDisabled: { opacity: 0.6 },
   submitText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  errorBox: {
+    backgroundColor: '#ef444422', borderRadius: 10,
+    padding: 12, borderWidth: 1, borderColor: '#ef4444',
+    gap: 4,
+  },
+  errorText: { color: '#ef4444', fontSize: 13, fontWeight: '600' },
 });
