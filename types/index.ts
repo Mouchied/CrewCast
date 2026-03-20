@@ -61,7 +61,6 @@ export interface Job {
   created_by: string;
   name: string;
   task_type_id?: string;
-  total_units: number;
   unit: string;
   start_date: string;
   target_end_date?: string;
@@ -76,7 +75,6 @@ export interface Job {
   longitude?: number;
   climate_zone?: string;
   crew_size?: number;
-  starting_units_completed?: number;
   starting_hours_used?: number;
   equipment_notes?: string;
   notes?: string;

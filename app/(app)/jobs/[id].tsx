@@ -47,11 +47,9 @@ export default function JobDetailScreen() {
   const [editTaskStartingUnits, setEditTaskStartingUnits] = useState('');
   const [showEditJob, setShowEditJob] = useState(false);
   const [editName, setEditName] = useState('');
-  const [editTotalUnits, setEditTotalUnits] = useState('');
   const [editCrewSize, setEditCrewSize] = useState('');
   const [editBidHours, setEditBidHours] = useState('');
   const [editBidCrewSize, setEditBidCrewSize] = useState('');
-  const [editStartingUnits, setEditStartingUnits] = useState('');
   const [editStartingHours, setEditStartingHours] = useState('');
   const [editStartDate, setEditStartDate] = useState('');
   const [editTargetEndDate, setEditTargetEndDate] = useState('');
@@ -163,11 +161,9 @@ export default function JobDetailScreen() {
   function openEditJob() {
     if (!job) return;
     setEditName(job.name);
-    setEditTotalUnits(String(job.total_units));
     setEditCrewSize(job.crew_size != null ? String(job.crew_size) : '');
     setEditBidHours(job.bid_hours != null ? String(job.bid_hours) : '');
     setEditBidCrewSize(job.bid_crew_size != null ? String(job.bid_crew_size) : '');
-    setEditStartingUnits(job.starting_units_completed != null ? String(job.starting_units_completed) : '');
     setEditStartingHours(job.starting_hours_used != null ? String(job.starting_hours_used) : '');
     setEditStartDate(job.start_date ?? '');
     setEditTargetEndDate(job.target_end_date ?? '');
@@ -178,18 +174,13 @@ export default function JobDetailScreen() {
 
   async function saveEditJob() {
     if (!editName.trim()) { setEditJobError('Missing: job name is required'); return; }
-    if (!editTotalUnits || isNaN(Number(editTotalUnits))) {
-      setEditJobError('Missing: total units is required (must be a number)'); return;
-    }
     setEditJobError('');
     setEditSaving(true);
     const { error } = await supabase.from('jobs').update({
       name: editName.trim(),
-      total_units: Number(editTotalUnits),
       crew_size: editCrewSize ? Number(editCrewSize) : null,
       bid_hours: editBidHours ? Number(editBidHours) : null,
       bid_crew_size: editBidCrewSize ? Number(editBidCrewSize) : null,
-      starting_units_completed: editStartingUnits ? Number(editStartingUnits) : 0,
       starting_hours_used: editStartingHours ? Number(editStartingHours) : 0,
       start_date: editStartDate || null,
       target_end_date: editTargetEndDate || null,
@@ -305,7 +296,7 @@ export default function JobDetailScreen() {
     return acc;
   }, {} as Record<string, number>));
 
-  // Task-based progress: simple average % across tasks that have units set
+  // Task-based progress: average % across tasks that have units set
   const tasksWithUnits = tasks.filter(t => (t.total_units ?? 0) > 0);
   const taskPcts = tasksWithUnits.map(t =>
     Math.min(100, ((taskProgress[t.id] ?? 0) / (t.total_units ?? 1)) * 100)
@@ -314,13 +305,9 @@ export default function JobDetailScreen() {
     ? taskPcts.reduce((a, b) => a + b, 0) / taskPcts.length
     : null;
 
-  // Fallback to snapshot/job-level if no tasks have units
-  const displayCompleted = snap?.units_completed ?? job.starting_units_completed ?? 0;
   const pct = avgTaskPct != null
     ? Math.min(100, Math.round(avgTaskPct))
-    : (job.total_units > 0
-      ? Math.min(100, Math.round((displayCompleted / job.total_units) * 100))
-      : 0);
+    : (snap?.earned_value_pct != null ? Math.round(snap.earned_value_pct) : 0);
 
   const paceColor = getPaceColor(snap?.pace_status);
   const forecastSentence = getForecastSentence(job);
@@ -404,10 +391,6 @@ export default function JobDetailScreen() {
           {tasksWithUnits.length > 0 ? (
             <Text style={styles.progressHint}>
               Avg of {tasksWithUnits.length} task{tasksWithUnits.length !== 1 ? 's' : ''} — adding new tasks reduces this %
-            </Text>
-          ) : job.total_units > 0 ? (
-            <Text style={styles.progressHint}>
-              {displayCompleted.toFixed(0)} of {job.total_units} {job.unit}
             </Text>
           ) : (
             <Text style={styles.progressHint}>Add tasks with units to track progress</Text>
@@ -675,10 +658,6 @@ export default function JobDetailScreen() {
             <Text style={styles.editLabel}>Job name *</Text>
             <TextInput style={styles.modalInput} value={editName} onChangeText={setEditName} placeholderTextColor={Colors.textMuted} placeholder="Job name" />
 
-            <Text style={styles.editLabel}>Total units *</Text>
-            <Text style={styles.editHint}>The total count of what you're building or installing — e.g. 316 panels, 500 ft of pipe, 24 homes. Every daily log tracks units completed against this number.</Text>
-            <TextInput style={styles.modalInput} value={editTotalUnits} onChangeText={setEditTotalUnits} placeholderTextColor={Colors.textMuted} placeholder="e.g. 316" keyboardType="numeric" />
-
             <Text style={styles.editLabel}>Default crew size</Text>
             <TextInput style={styles.modalInput} value={editCrewSize} onChangeText={setEditCrewSize} placeholderTextColor={Colors.textMuted} placeholder="e.g. 4" keyboardType="numeric" />
 
@@ -689,10 +668,6 @@ export default function JobDetailScreen() {
             <Text style={styles.editLabel}>Hours already used (starting offset)</Text>
             <Text style={styles.editHint}>Man-hours already burned before you started tracking in CrewCast. Used for accurate burn rate from day one.</Text>
             <TextInput style={styles.modalInput} value={editStartingHours} onChangeText={setEditStartingHours} placeholderTextColor={Colors.textMuted} placeholder="e.g. 320" keyboardType="numeric" />
-
-            <Text style={styles.editLabel}>Units already completed (starting offset)</Text>
-            <Text style={styles.editHint}>Rows/units done before you started logging. Progress bar and ETA will start from here.</Text>
-            <TextInput style={styles.modalInput} value={editStartingUnits} onChangeText={setEditStartingUnits} placeholderTextColor={Colors.textMuted} placeholder="e.g. 212" keyboardType="numeric" />
 
             <Text style={styles.editLabel}>Bid crew size</Text>
             <TextInput style={styles.modalInput} value={editBidCrewSize} onChangeText={setEditBidCrewSize} placeholderTextColor={Colors.textMuted} placeholder="e.g. 4" keyboardType="numeric" />

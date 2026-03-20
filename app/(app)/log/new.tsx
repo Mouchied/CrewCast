@@ -244,9 +244,7 @@ export default function NewLogScreen() {
   }
 
   const snap = job?.job_snapshots;
-  const pct = snap && job?.total_units
-    ? Math.min(100, Math.round((snap.units_completed / job.total_units) * 100))
-    : 0;
+  const pct = snap?.earned_value_pct != null ? Math.min(100, Math.round(snap.earned_value_pct)) : 0;
 
   return (
     <View style={styles.container}>
@@ -270,7 +268,7 @@ export default function NewLogScreen() {
               <View style={[styles.progressFill, { width: `${pct}%` as any }]} />
             </View>
             <Text style={styles.progressText}>
-              {snap?.units_completed?.toFixed(0) ?? 0} / {job.total_units} {job.unit} complete
+              {pct}% complete
             </Text>
           </View>
         )}

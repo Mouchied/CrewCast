@@ -19,7 +19,6 @@ export default function NewJobScreen() {
   const [name, setName] = useState('');
   const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
   const [selectedTaskType, setSelectedTaskType] = useState<TaskType | null>(null);
-  const [totalUnits, setTotalUnits] = useState('');
   const [crewSize, setCrewSize] = useState('');
   const [bidHours, setBidHours] = useState('');
   const [bidCrewSize, setBidCrewSize] = useState('');
@@ -37,7 +36,6 @@ export default function NewJobScreen() {
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<string[]>([]);
-  const [startingUnits, setStartingUnits] = useState('');
   const [startingHours, setStartingHours] = useState('');
   const [customTask, setCustomTask] = useState('');
   const [customUnit, setCustomUnit] = useState('');
@@ -120,14 +118,12 @@ export default function NewJobScreen() {
         created_by: profile!.id,
         name: name.trim(),
         task_type_id: taskTypeId ?? null,
-        total_units: totalUnits ? Number(totalUnits) : 0,
         unit,
         start_date: startDate,
         target_end_date: targetEndDate || null,
         crew_size: crewSize ? Math.round(Number(crewSize)) : null,
         bid_hours: bidHours ? Number(bidHours) : null,
         bid_crew_size: bidCrewSize ? Math.round(Number(bidCrewSize)) : null,
-        starting_units_completed: startingUnits ? Number(startingUnits) : 0,
         starting_hours_used: startingHours ? Number(startingHours) : 0,
         location_name: locationName || null,
         city: city || null,

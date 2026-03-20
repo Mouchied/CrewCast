@@ -11,9 +11,7 @@ export function JobCard({ job }: Props) {
   const router = useRouter();
   const snap = job.job_snapshots;
 
-  const pct = snap && job.total_units > 0
-    ? Math.min(100, Math.round((snap.units_completed / job.total_units) * 100))
-    : 0;
+  const pct = snap?.earned_value_pct != null ? Math.min(100, Math.round(snap.earned_value_pct)) : 0;
 
   const paceStatus = snap?.pace_status;
   const statusColor = getPaceColor(paceStatus);
