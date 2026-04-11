@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  View, Text, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/Colors';
+import { Button } from '../../components/Button';
+import { Input } from '../../components/Input';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -39,37 +41,31 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.form}>
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
+          <Input
+            label="Email"
             value={email}
             onChangeText={setEmail}
             placeholder="you@company.com"
-            placeholderTextColor={Colors.textMuted}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
           />
 
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
+          <Input
+            label="Password"
             value={password}
             onChangeText={setPassword}
             placeholder="••••••••"
-            placeholderTextColor={Colors.textMuted}
             secureTextEntry
+            error={error || undefined}
           />
 
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-          <TouchableOpacity
-            style={[styles.btn, loading && styles.btnDisabled]}
+          <Button
+            label={loading ? 'Signing in…' : 'Sign In'}
             onPress={handleLogin}
-            disabled={loading}
-          >
-            <Text style={styles.btnText}>{loading ? 'Signing in…' : 'Sign In'}</Text>
-          </TouchableOpacity>
+            loading={loading}
+            style={styles.btnMargin}
+          />
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>Don't have an account? </Text>
@@ -88,26 +84,7 @@ const styles = StyleSheet.create({
   logo: { fontSize: 42, fontWeight: '800', color: Colors.primary, letterSpacing: -1 },
   tagline: { color: Colors.textSecondary, marginTop: 8, fontSize: 15 },
   form: { gap: 12 },
-  label: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600', marginBottom: -4 },
-  input: {
-    backgroundColor: Colors.bgInput,
-    borderRadius: 12,
-    padding: 16,
-    color: Colors.textPrimary,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  btn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    padding: 18,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  btnDisabled: { opacity: 0.6 },
-  btnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  errorText: { color: '#ff6b6b', fontSize: 14, textAlign: 'center', backgroundColor: 'rgba(255,107,107,0.1)', padding: 12, borderRadius: 8 },
+  btnMargin: { marginTop: 8 },
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
   footerText: { color: Colors.textSecondary },
   link: { color: Colors.primary, fontWeight: '600' },
