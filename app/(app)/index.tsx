@@ -1,47 +1,45 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  RefreshControl, Alert,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { Job } from '../../types';
 import { JobCard } from '../../components/JobCard';
+import { ErrorBoundary } from '../../components/ErrorBoundary';
+import { useRetryQuery } from '../../hooks/useRetryQuery';
 import { Colors } from '../../constants/Colors';
 
-export default function DashboardScreen() {
+function DashboardScreen() {
   const { profile, session } = useAuth();
   const router = useRouter();
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    fetchJobs();
-  }, [profile]);
-
-  async function fetchJobs() {
+  const queryFn = useCallback(() => {
     if (!profile?.company_id) {
-      setLoading(false);
-      return;
+      return Promise.resolve({ data: [] as Job[], error: null });
     }
-    const { data, error } = await supabase
+    return supabase
       .from('jobs')
       .select(`*, task_types(*), job_snapshots(*)`)
       .eq('company_id', profile.company_id)
       .eq('status', 'active')
       .order('created_at', { ascending: false });
+  }, [profile?.company_id]);
 
-    if (error) Alert.alert('Error', error.message);
-    else setJobs(data ?? []);
-    setLoading(false);
-    setRefreshing(false);
-  }
+  const { data, error, loading, run } = useRetryQuery<Job[]>(queryFn);
+  const jobs = data ?? [];
 
-  const onRefresh = () => {
+  useEffect(() => {
+    run();
+  }, [run]);
+
+  const onRefresh = async () => {
     setRefreshing(true);
-    fetchJobs();
+    await run();
+    setRefreshing(false);
   };
 
   async function signOut() {
@@ -107,9 +105,18 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
+        {error && (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorText}>Failed to load jobs: {error}</Text>
+            <TouchableOpacity onPress={run}>
+              <Text style={styles.errorRetry}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {loading ? (
           <Text style={styles.empty}>Loading…</Text>
-        ) : activeJobs.length === 0 ? (
+        ) : activeJobs.length === 0 && !error ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>No active jobs yet</Text>
             <Text style={styles.emptyBody}>
@@ -182,4 +189,19 @@ const styles = StyleSheet.create({
     padding: 16, marginBottom: 16, borderWidth: 1, borderColor: Colors.warning + '44',
   },
   setupText: { color: Colors.warning, fontSize: 14 },
+  errorBanner: {
+    backgroundColor: Colors.danger + '22', borderRadius: 12,
+    padding: 16, marginBottom: 16, borderWidth: 1, borderColor: Colors.danger + '44',
+    gap: 8,
+  },
+  errorText: { color: Colors.danger, fontSize: 14 },
+  errorRetry: { color: Colors.primary, fontWeight: '700', fontSize: 14 },
 });
+
+export default function DashboardScreenWithBoundary() {
+  return (
+    <ErrorBoundary fallbackTitle="Dashboard failed to load">
+      <DashboardScreen />
+    </ErrorBoundary>
+  );
+}
