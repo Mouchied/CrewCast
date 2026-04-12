@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput,
-  Alert, Switch,
+  View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { Company, CompanySubscription, TaskType, CrewMember } from '../../types';
 import { Colors } from '../../constants/Colors';
+import { showToast } from '../../lib/toast';
+import { ConfirmDialog, ConfirmOptions } from '../../components/ConfirmDialog';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -29,6 +30,7 @@ export default function SettingsScreen() {
   const [inviteError, setInviteError] = useState('');
   const [taskTypeError, setTaskTypeError] = useState('');
   const [crewError, setCrewError] = useState('');
+  const [pendingConfirm, setPendingConfirm] = useState<ConfirmOptions | null>(null);
 
   useEffect(() => { if (profile?.company_id) fetchData(); }, [profile]);
 
@@ -88,13 +90,10 @@ export default function SettingsScreen() {
 
     setInviting(false);
     if (error) {
-      Alert.alert('Error', error.message);
+      showToast('error', error.message);
     } else {
       setInviteEmail('');
-      Alert.alert(
-        'Invitation created',
-        `An invite link has been generated for ${inviteEmail}. Share it with them to join your company.`
-      );
+      showToast('success', `Invite created for ${inviteEmail}. Share it with them to join.`);
     }
   }
 
@@ -113,7 +112,7 @@ export default function SettingsScreen() {
 
     setAddingTask(false);
     if (error) {
-      Alert.alert('Error', error.message);
+      showToast('error', error.message);
     } else {
       setNewTaskName('');
       setNewTaskUnit('');
@@ -134,7 +133,7 @@ export default function SettingsScreen() {
     });
     setAddingCrew(false);
     if (error) {
-      Alert.alert('Error', error.message);
+      showToast('error', error.message);
     } else {
       setNewCrewName('');
       setNewCrewTrade('');
@@ -143,38 +142,29 @@ export default function SettingsScreen() {
   }
 
   function deactivateCrew(member: CrewMember) {
-    Alert.alert(
-      `Remove ${member.name}?`,
-      'They will no longer appear in the crew tagger. Their historical log data is preserved.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            await supabase
-              .from('crew_members')
-              .update({ active: false })
-              .eq('id', member.id);
-            fetchData();
-          },
-        },
-      ]
-    );
+    setPendingConfirm({
+      title: `Remove ${member.name}?`,
+      message: 'They will no longer appear in the crew tagger. Their historical log data is preserved.',
+      confirmLabel: 'Remove',
+      onConfirm: async () => {
+        setPendingConfirm(null);
+        await supabase.from('crew_members').update({ active: false }).eq('id', member.id);
+        fetchData();
+      },
+    });
   }
 
-  async function signOut() {
-    Alert.alert('Sign out?', 'You will need to sign in again.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign out',
-        style: 'destructive',
-        onPress: async () => {
-          await supabase.auth.signOut();
-          router.replace('/(auth)/login');
-        },
+  function signOut() {
+    setPendingConfirm({
+      title: 'Sign out?',
+      message: 'You will need to sign in again.',
+      confirmLabel: 'Sign out',
+      onConfirm: async () => {
+        setPendingConfirm(null);
+        await supabase.auth.signOut();
+        router.replace('/(auth)/login');
       },
-    ]);
+    });
   }
 
   const plan = (subscription as any)?.plans;
@@ -425,6 +415,16 @@ export default function SettingsScreen() {
 
         <View style={{ height: 60 }} />
       </ScrollView>
+
+      {pendingConfirm && (
+        <ConfirmDialog
+          title={pendingConfirm.title}
+          message={pendingConfirm.message}
+          confirmLabel={pendingConfirm.confirmLabel}
+          onConfirm={pendingConfirm.onConfirm}
+          onCancel={() => setPendingConfirm(null)}
+        />
+      )}
     </View>
   );
 }

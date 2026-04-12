@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  RefreshControl, Alert,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
@@ -9,6 +9,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { Job } from '../../types';
 import { JobCard } from '../../components/JobCard';
 import { Colors } from '../../constants/Colors';
+import { showToast } from '../../lib/toast';
 
 export default function DashboardScreen() {
   const { profile, session } = useAuth();
@@ -33,7 +34,7 @@ export default function DashboardScreen() {
       .eq('status', 'active')
       .order('created_at', { ascending: false });
 
-    if (error) Alert.alert('Error', error.message);
+    if (error) showToast('error', error.message);
     else setJobs(data ?? []);
     setLoading(false);
     setRefreshing(false);

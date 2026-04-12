@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Alert } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { Job } from '../types';
+import { showToast } from '../lib/toast';
 
 export function useJobEdit(id: string | undefined, job: Job | null, onSaved: () => void) {
   const [showEditJob, setShowEditJob] = useState(false);
@@ -56,7 +56,7 @@ export function useJobEdit(id: string | undefined, job: Job | null, onSaved: () 
       location_name: editLocationName || null,
     }).eq('id', id);
     setEditSaving(false);
-    if (error) { Alert.alert('Error', error.message); return; }
+    if (error) { showToast('error', error.message); return; }
     setShowEditJob(false);
     onSaved();
   }

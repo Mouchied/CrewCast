@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator } from 'react-native';
 import { useAuth } from '../hooks/useAuth';
 import { Colors } from '../constants/Colors';
+import { Toast } from '../components/Toast';
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
@@ -36,6 +37,7 @@ export default function RootLayout() {
     <AuthGate>
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }} />
+      <Toast />
     </AuthGate>
   );
 }

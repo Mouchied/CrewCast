@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { getPaceColor, getForecastSentence } from '../../../types';
@@ -7,7 +7,8 @@ import { Colors } from '../../../constants/Colors';
 import JobVariables, { jobVariablesToPending } from '../../../components/JobVariables';
 import { Button } from '../../../components/Button';
 import { Card } from '../../../components/Card';
-import { webConfirm } from '../../../lib/webConfirm';
+import { showToast } from '../../../lib/toast';
+import { ConfirmDialog, ConfirmOptions } from '../../../components/ConfirmDialog';
 import { useJobData } from '../../../hooks/useJobData';
 import { useJobEdit } from '../../../hooks/useJobEdit';
 import { useTaskEdit } from '../../../hooks/useTaskEdit';
@@ -23,40 +24,59 @@ export default function JobDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const { job, logs, tasks, setTasks, jobVars, taskVars, loading, fetchData } = useJobData(id);
+
+  const [pendingConfirm, setPendingConfirm] = useState<ConfirmOptions | null>(null);
+  function requestConfirm(opts: ConfirmOptions) { setPendingConfirm(opts); }
+  function dismissConfirm() { setPendingConfirm(null); }
+
   const jobEditHook = useJobEdit(id, job, fetchData);
-  const taskEditHook = useTaskEdit(id, fetchData);
+  const taskEditHook = useTaskEdit(id, fetchData, requestConfirm);
   const taskAddHook = useTaskAdd(id, tasks, fetchData);
 
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
-  async function markComplete() {
-    webConfirm('Mark this job complete? It will be archived and removed from your active list.', async () => {
-      const result = await supabase.from('jobs').update({ status: 'completed' }).eq('id', id).select('id');
-      console.log('[markComplete]', JSON.stringify(result));
-      const { data, error } = result;
-      if (error) Alert.alert('Error', error.message);
-      else if (!data?.length) Alert.alert('Error', 'Permission denied — could not update job.');
-      else router.replace('/(app)/jobs');
+  function markComplete() {
+    requestConfirm({
+      title: 'Mark job complete?',
+      message: 'It will be archived and removed from your active list.',
+      confirmLabel: 'Mark complete',
+      onConfirm: async () => {
+        dismissConfirm();
+        const { data, error } = await supabase.from('jobs').update({ status: 'completed' }).eq('id', id).select('id');
+        if (error) showToast('error', error.message);
+        else if (!data?.length) showToast('error', 'Permission denied — could not update job.');
+        else router.replace('/(app)/jobs');
+      },
     });
   }
 
-  async function deleteJob() {
-    webConfirm('Delete job? This will permanently delete the job and all its logs. This cannot be undone.', async () => {
-      const result = await supabase.from('jobs').delete().eq('id', id).select('id');
-      console.log('[deleteJob]', JSON.stringify(result));
-      const { data, error } = result;
-      if (error) Alert.alert('Error', error.message);
-      else if (!data?.length) Alert.alert('Error', 'Permission denied — could not delete job.');
-      else router.replace('/(app)/jobs');
+  function deleteJob() {
+    requestConfirm({
+      title: 'Delete job?',
+      message: 'This will permanently delete the job and all its logs. This cannot be undone.',
+      confirmLabel: 'Delete',
+      onConfirm: async () => {
+        dismissConfirm();
+        const { data, error } = await supabase.from('jobs').delete().eq('id', id).select('id');
+        if (error) showToast('error', error.message);
+        else if (!data?.length) showToast('error', 'Permission denied — could not delete job.');
+        else router.replace('/(app)/jobs');
+      },
     });
   }
 
-  async function deleteLog(logId: string) {
-    Alert.alert("Delete log?", "This will remove this day's entry and recalculate your ETA.", [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => { await supabase.from('daily_logs').delete().eq('id', logId); fetchData(); } },
-    ]);
+  function deleteLog(logId: string) {
+    requestConfirm({
+      title: 'Delete log?',
+      message: "This will remove this day's entry and recalculate your ETA.",
+      confirmLabel: 'Delete',
+      onConfirm: async () => {
+        dismissConfirm();
+        await supabase.from('daily_logs').delete().eq('id', logId);
+        fetchData();
+      },
+    });
   }
 
   async function toggleTaskStatus(task: import('../../../types').Task) {
@@ -65,7 +85,7 @@ export default function JobDetailScreen() {
       : task.status === 'active' ? 'completed'
       : 'pending';
     const { error } = await supabase.from('tasks').update({ status: nextStatus }).eq('id', task.id);
-    if (error) Alert.alert('Error', error.message);
+    if (error) showToast('error', error.message);
     else fetchData();
   }
 
@@ -288,6 +308,16 @@ export default function JobDetailScreen() {
       <EditJobModal hook={jobEditHook} />
       <EditTaskModal hook={taskEditHook} job={job} />
       <AddTaskModal hook={taskAddHook} />
+
+      {pendingConfirm && (
+        <ConfirmDialog
+          title={pendingConfirm.title}
+          message={pendingConfirm.message}
+          confirmLabel={pendingConfirm.confirmLabel}
+          onConfirm={pendingConfirm.onConfirm}
+          onCancel={dismissConfirm}
+        />
+      )}
     </View>
   );
 }

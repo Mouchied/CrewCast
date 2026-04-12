@@ -1,10 +1,14 @@
 import { useState } from 'react';
-import { Alert } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { Task } from '../types';
-import { webConfirm } from '../lib/webConfirm';
+import { showToast } from '../lib/toast';
+import { ConfirmOptions } from '../components/ConfirmDialog';
 
-export function useTaskEdit(id: string | undefined, onSaved: () => void) {
+export function useTaskEdit(
+  id: string | undefined,
+  onSaved: () => void,
+  requestConfirm: (opts: ConfirmOptions) => void,
+) {
   const [showEditTask, setShowEditTask] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editTaskName, setEditTaskName] = useState('');
@@ -45,24 +49,23 @@ export function useTaskEdit(id: string | undefined, onSaved: () => void) {
       setEditingTask(null);
       onSaved();
     } else {
-      Alert.alert('Error', error.message);
+      showToast('error', error.message);
     }
   }
 
-  async function deleteTask(task: Task) {
-    webConfirm(
-      `Delete task "${task.name}"? Any logs tagged to this task will be unlinked.`,
-      async () => {
-        const unlinkResult = await supabase.from('daily_logs').update({ task_id: null }).eq('task_id', task.id);
-        console.log('[deleteTask unlink]', JSON.stringify(unlinkResult));
-        const result = await supabase.from('tasks').delete().eq('id', task.id).select('id');
-        console.log('[deleteTask]', JSON.stringify(result));
-        const { data, error } = result;
-        if (error) Alert.alert('Error', error.message);
-        else if (!data?.length) Alert.alert('Error', 'Permission denied — could not delete task.');
+  function deleteTask(task: Task) {
+    requestConfirm({
+      title: 'Delete task?',
+      message: `"${task.name}" will be removed. Any logs tagged to this task will be unlinked.`,
+      confirmLabel: 'Delete',
+      onConfirm: async () => {
+        await supabase.from('daily_logs').update({ task_id: null }).eq('task_id', task.id);
+        const { data, error } = await supabase.from('tasks').delete().eq('id', task.id).select('id');
+        if (error) showToast('error', error.message);
+        else if (!data?.length) showToast('error', 'Permission denied — could not delete task.');
         else onSaved();
-      }
-    );
+      },
+    });
   }
 
   return {

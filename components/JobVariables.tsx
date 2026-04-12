@@ -9,11 +9,12 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Modal, Alert,
+  ScrollView, ActivityIndicator, Modal,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { Colors } from '../constants/Colors';
 import type { JobVariableType, JobVariable } from '../types';
+import { showToast } from '../lib/toast';
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -120,7 +121,7 @@ export default function JobVariables({
       .single();
 
     if (!profile?.company_id) {
-      Alert.alert('Error', 'Could not find your company.');
+      showToast('error', 'Could not find your company.');
       setCreatingType(false);
       return;
     }
@@ -143,7 +144,7 @@ export default function JobVariables({
     setCreatingType(false);
 
     if (error) {
-      Alert.alert('Error', error.message);
+      showToast('error', error.message);
       return;
     }
 

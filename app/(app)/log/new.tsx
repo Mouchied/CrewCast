@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, ActivityIndicator,
+  ScrollView, ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Location from 'expo-location';
@@ -11,6 +11,7 @@ import { Job, Task, WeatherData, CrewMember } from '../../../types';
 import { Colors } from '../../../constants/Colors';
 import { fetchWeather } from '../../../lib/weather';
 import JobVariables, { PendingVariable, jobVariablesToPending } from '../../../components/JobVariables';
+import { showToast } from '../../../lib/toast';
 
 type TaskEntry = {
   localId: string;
@@ -203,12 +204,9 @@ export default function NewLogScreen() {
           const taskName = entry.taskId
             ? (tasks.find(t => t.id === entry.taskId)?.name ?? 'that task')
             : 'General';
-          Alert.alert(
-            'Already logged',
-            `"${taskName}" already has a log for this date. Remove it first to re-log.`
-          );
+          showToast('error', `"${taskName}" already has a log for this date. Remove it first to re-log.`);
         } else {
-          Alert.alert('Error saving log', error.message);
+          showToast('error', error.message);
         }
         return;
       }

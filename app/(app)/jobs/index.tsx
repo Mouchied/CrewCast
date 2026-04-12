@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, RefreshControl,
-  TouchableOpacity, Alert,
+  TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
@@ -9,6 +9,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { Job } from '../../../types';
 import { JobCard } from '../../../components/JobCard';
 import { Colors } from '../../../constants/Colors';
+import { showToast } from '../../../lib/toast';
 
 type Filter = 'active' | 'completed' | 'all';
 
@@ -33,7 +34,7 @@ export default function JobsScreen() {
     if (filter !== 'all') query = query.eq('status', filter);
 
     const { data, error } = await query;
-    if (error) Alert.alert('Error', error.message);
+    if (error) showToast('error', error.message);
     else setJobs(data ?? []);
     setLoading(false);
     setRefreshing(false);
