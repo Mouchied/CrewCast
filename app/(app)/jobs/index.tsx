@@ -9,6 +9,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { Job } from '../../../types';
 import { JobCard } from '../../../components/JobCard';
 import { Colors } from '../../../constants/Colors';
+import { Button } from '../../../components/Button';
 
 type Filter = 'active' | 'completed' | 'all';
 
@@ -49,12 +50,11 @@ export default function JobsScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Jobs</Text>
-        <TouchableOpacity
+        <Button
+          label="+ New"
           onPress={() => router.push('/(app)/jobs/new')}
           style={styles.newBtn}
-        >
-          <Text style={styles.newBtnText}>+ New</Text>
-        </TouchableOpacity>
+        />
       </View>
 
       <View style={styles.filterRow}>
@@ -103,10 +103,9 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 28, fontWeight: '800', color: Colors.textPrimary },
   newBtn: {
-    backgroundColor: Colors.primary, borderRadius: 10,
-    paddingHorizontal: 16, paddingVertical: 8,
+    minHeight: 0, paddingVertical: 8, paddingHorizontal: 16,
+    borderRadius: 10,
   },
-  newBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   filterRow: {
     flexDirection: 'row', padding: 16, gap: 8,
     borderBottomWidth: 1, borderBottomColor: Colors.border,

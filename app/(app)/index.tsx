@@ -9,6 +9,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { Job } from '../../types';
 import { JobCard } from '../../components/JobCard';
 import { Colors } from '../../constants/Colors';
+import { Button } from '../../components/Button';
 
 export default function DashboardScreen() {
   const { profile, session } = useAuth();
@@ -115,12 +116,10 @@ export default function DashboardScreen() {
             <Text style={styles.emptyBody}>
               Start by creating your first job. The more you log, the smarter your forecasts get.
             </Text>
-            <TouchableOpacity
-              style={styles.ctaBtn}
+            <Button
+              label="Create your first job"
               onPress={() => router.push('/(app)/jobs/new')}
-            >
-              <Text style={styles.ctaBtnText}>Create your first job</Text>
-            </TouchableOpacity>
+            />
           </View>
         ) : (
           activeJobs.map(job => <JobCard key={job.id} job={job} />)
@@ -172,11 +171,6 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', padding: 32, gap: 12 },
   emptyTitle: { fontSize: 20, fontWeight: '700', color: Colors.textPrimary },
   emptyBody: { color: Colors.textSecondary, textAlign: 'center', lineHeight: 22 },
-  ctaBtn: {
-    backgroundColor: Colors.primary, borderRadius: 12,
-    paddingHorizontal: 24, paddingVertical: 14, marginTop: 8,
-  },
-  ctaBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   setupBanner: {
     backgroundColor: Colors.warning + '22', borderRadius: 12,
     padding: 16, marginBottom: 16, borderWidth: 1, borderColor: Colors.warning + '44',

@@ -8,6 +8,9 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { Company, CompanySubscription, TaskType, CrewMember } from '../../types';
 import { Colors } from '../../constants/Colors';
+import { Button } from '../../components/Button';
+import { Input } from '../../components/Input';
+import { Card } from '../../components/Card';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -253,9 +256,7 @@ export default function SettingsScreen() {
               <Text style={styles.upgradeBody}>
                 Growth plan: $250/mo — 20 active jobs, unlimited users, cross-job benchmarks.
               </Text>
-              <TouchableOpacity style={styles.upgradeBtn}>
-                <Text style={styles.upgradeBtnText}>Upgrade to Growth →</Text>
-              </TouchableOpacity>
+              <Button label="Upgrade to Growth →" />
             </View>
           )}
         </View>
@@ -278,18 +279,18 @@ export default function SettingsScreen() {
           </View>
 
           {/* Invite */}
-          <View style={styles.inviteCard}>
+          <Card style={styles.inviteCard}>
             <Text style={styles.inviteTitle}>Invite a team member</Text>
             <View style={styles.inviteRow}>
-              <TextInput
-                style={styles.inviteInput}
-                value={inviteEmail}
-                onChangeText={t => { setInviteEmail(t); setInviteError(''); }}
-                placeholder="foreman@company.com"
-                placeholderTextColor={Colors.textMuted}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
+              <View style={{ flex: 1 }}>
+                <Input
+                  value={inviteEmail}
+                  onChangeText={t => { setInviteEmail(t); setInviteError(''); }}
+                  placeholder="foreman@company.com"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
               <TouchableOpacity
                 style={[styles.inviteBtn, inviting && { opacity: 0.6 }]}
                 onPress={sendInvite}
@@ -299,7 +300,7 @@ export default function SettingsScreen() {
               </TouchableOpacity>
             </View>
             {!!inviteError && <Text style={styles.inlineError}>{inviteError}</Text>}
-          </View>
+          </Card>
         </View>
 
         {/* ── CUSTOM TASK TYPES ── */}
@@ -322,30 +323,24 @@ export default function SettingsScreen() {
               ))}
             </View>
           )}
-          <View style={styles.addTaskCard}>
-            <TextInput
-              style={styles.input}
+          <Card style={{ gap: 10 }}>
+            <Input
               value={newTaskName}
               onChangeText={t => { setNewTaskName(t); setTaskTypeError(''); }}
               placeholder="Task type name (e.g. String inverter installation)"
-              placeholderTextColor={Colors.textMuted}
             />
-            <TextInput
-              style={styles.input}
+            <Input
               value={newTaskUnit}
               onChangeText={t => { setNewTaskUnit(t); setTaskTypeError(''); }}
               placeholder="Unit (e.g. inverters, feet, panels)"
-              placeholderTextColor={Colors.textMuted}
             />
             {!!taskTypeError && <Text style={styles.inlineError}>{taskTypeError}</Text>}
-            <TouchableOpacity
-              style={[styles.addBtn, addingTask && { opacity: 0.6 }]}
+            <Button
+              label="+ Add Task Type"
               onPress={addCustomTaskType}
-              disabled={addingTask}
-            >
-              <Text style={styles.addBtnText}>+ Add Task Type</Text>
-            </TouchableOpacity>
-          </View>
+              loading={addingTask}
+            />
+          </Card>
         </View>
 
         {/* ── CREW MEMBERS ── */}
@@ -385,30 +380,24 @@ export default function SettingsScreen() {
           )}
 
           {/* Add crew member */}
-          <View style={styles.addTaskCard}>
-            <TextInput
-              style={styles.input}
+          <Card style={{ gap: 10 }}>
+            <Input
               value={newCrewName}
               onChangeText={t => { setNewCrewName(t); setCrewError(''); }}
               placeholder="Name (e.g. Bob Smith)"
-              placeholderTextColor={Colors.textMuted}
             />
-            <TextInput
-              style={styles.input}
+            <Input
               value={newCrewTrade}
               onChangeText={setNewCrewTrade}
               placeholder="Trade / specialty (e.g. electrician, roofer)"
-              placeholderTextColor={Colors.textMuted}
             />
             {!!crewError && <Text style={styles.inlineError}>{crewError}</Text>}
-            <TouchableOpacity
-              style={[styles.addBtn, addingCrew && { opacity: 0.6 }]}
+            <Button
+              label="+ Add Crew Member"
               onPress={addCrewMember}
-              disabled={addingCrew}
-            >
-              <Text style={styles.addBtnText}>+ Add Crew Member</Text>
-            </TouchableOpacity>
-          </View>
+              loading={addingCrew}
+            />
+          </Card>
         </View>
 
         {/* ── ACCOUNT ── */}
@@ -418,9 +407,7 @@ export default function SettingsScreen() {
             <Row label="Email" value={session?.user?.email ?? '—'} />
             <Row label="Name" value={profile?.full_name ?? '—'} />
           </View>
-          <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>
-            <Text style={styles.signOutText}>Sign Out</Text>
-          </TouchableOpacity>
+          <Button label="Sign Out" variant="destructive" onPress={signOut} />
         </View>
 
         <View style={{ height: 60 }} />
@@ -483,29 +470,15 @@ const styles = StyleSheet.create({
   },
   upgradeTitle: { fontSize: 15, fontWeight: '800', color: Colors.primary },
   upgradeBody: { fontSize: 13, color: Colors.textSecondary, lineHeight: 19 },
-  upgradeBtn: {
-    backgroundColor: Colors.primary, borderRadius: 10,
-    paddingVertical: 12, alignItems: 'center',
-  },
-  upgradeBtnText: { color: '#fff', fontWeight: '700' },
-
   memberRow: {
     paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
   memberName: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
   memberRole: { fontSize: 12, color: Colors.textMuted, marginTop: 2, textTransform: 'capitalize' },
 
-  inviteCard: {
-    backgroundColor: Colors.bgCard, borderRadius: 14,
-    padding: 16, gap: 10, borderWidth: 1, borderColor: Colors.border,
-  },
+  inviteCard: { gap: 10 },
   inviteTitle: { fontSize: 14, fontWeight: '700', color: Colors.textSecondary },
   inviteRow: { flexDirection: 'row', gap: 8 },
-  inviteInput: {
-    flex: 1, backgroundColor: Colors.bgInput, borderRadius: 10,
-    padding: 12, color: Colors.textPrimary, fontSize: 14,
-    borderWidth: 1, borderColor: Colors.border,
-  },
   inviteBtn: {
     backgroundColor: Colors.primary, borderRadius: 10,
     paddingHorizontal: 16, justifyContent: 'center',
@@ -519,20 +492,6 @@ const styles = StyleSheet.create({
   taskTypeName: { fontSize: 14, color: Colors.textPrimary, fontWeight: '600' },
   taskTypeUnit: { fontSize: 13, color: Colors.textMuted },
 
-  addTaskCard: {
-    backgroundColor: Colors.bgCard, borderRadius: 14,
-    padding: 14, gap: 10, borderWidth: 1, borderColor: Colors.border,
-  },
-  input: {
-    backgroundColor: Colors.bgInput, borderRadius: 10, padding: 14,
-    color: Colors.textPrimary, fontSize: 15,
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  addBtn: {
-    backgroundColor: Colors.primary, borderRadius: 10,
-    paddingVertical: 14, alignItems: 'center',
-  },
-  addBtnText: { color: '#fff', fontWeight: '700' },
 
   emptyText: { color: Colors.textMuted, fontSize: 13 },
 
@@ -550,11 +509,6 @@ const styles = StyleSheet.create({
   crewRemoveBtn: { paddingHorizontal: 10, paddingVertical: 6 },
   crewRemoveText: { color: Colors.danger, fontSize: 12, fontWeight: '600' },
 
-  signOutBtn: {
-    borderWidth: 1, borderColor: Colors.danger + '66',
-    borderRadius: 12, paddingVertical: 14, alignItems: 'center',
-  },
-  signOutText: { color: Colors.danger, fontWeight: '700', fontSize: 15 },
   inlineError: {
     color: '#ef4444', fontSize: 13, fontWeight: '600',
     backgroundColor: '#ef444422', borderRadius: 8,
