@@ -18,11 +18,11 @@ function DashboardScreen() {
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
 
-  const queryFn = useCallback(() => {
+  const queryFn = useCallback(async () => {
     if (!profile?.company_id) {
-      return Promise.resolve({ data: [] as Job[], error: null });
+      return { data: [] as Job[], error: null };
     }
-    return supabase
+    return await supabase
       .from('jobs')
       .select(`*, task_types(*), job_snapshots(*)`)
       .eq('company_id', profile.company_id)
