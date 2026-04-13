@@ -9,6 +9,8 @@ import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../hooks/useAuth';
 import { Job, Task, WeatherData, CrewMember } from '../../../types';
 import { Colors } from '../../../constants/Colors';
+import { ErrorBoundary } from '../../../components/ErrorBoundary';
+import { withRetryQuery } from '../../../lib/withRetry';
 import { fetchWeather } from '../../../lib/weather';
 import JobVariables, { PendingVariable, jobVariablesToPending } from '../../../components/JobVariables';
 
@@ -30,7 +32,7 @@ function makeEntry(): TaskEntry {
   };
 }
 
-export default function NewLogScreen() {
+function NewLogScreen() {
   const router = useRouter();
   const { jobId } = useLocalSearchParams<{ jobId: string }>();
   const { profile } = useAuth();
@@ -50,6 +52,7 @@ export default function NewLogScreen() {
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [entryErrors, setEntryErrors] = useState<Record<string, string>>({});
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     if (jobId && profile?.company_id) fetchJob();
@@ -60,36 +63,32 @@ export default function NewLogScreen() {
   }, []);
 
   async function fetchJob() {
-    const [{ data: jobData }, { data: taskData }, { data: varData }, { data: memberData }] =
-      await Promise.all([
-        supabase
-          .from('jobs')
-          .select('*, task_types(*), job_snapshots(*)')
-          .eq('id', jobId)
-          .single(),
-        supabase
-          .from('tasks')
-          .select('*')
-          .eq('job_id', jobId)
-          .neq('status', 'completed')
-          .order('sequence_order'),
-        supabase
-          .from('job_variables')
-          .select('*, job_variable_types(*)')
-          .eq('job_id', jobId)
-          .order('created_at'),
-        supabase
-          .from('crew_members')
-          .select('*')
-          .eq('company_id', profile?.company_id)
-          .eq('active', true)
-          .order('name'),
-      ]);
+    setFetchError(null);
+    const [jobResult, taskResult, varResult, memberResult] = await Promise.all([
+      withRetryQuery(() =>
+        supabase.from('jobs').select('*, task_types(*), job_snapshots(*)').eq('id', jobId).single()
+      ),
+      withRetryQuery(() =>
+        supabase.from('tasks').select('*').eq('job_id', jobId).neq('status', 'completed').order('sequence_order')
+      ),
+      withRetryQuery(() =>
+        supabase.from('job_variables').select('*, job_variable_types(*)').eq('job_id', jobId).order('created_at')
+      ),
+      withRetryQuery(() =>
+        supabase.from('crew_members').select('*').eq('company_id', profile?.company_id).eq('active', true).order('name')
+      ),
+    ]);
 
-    if (jobData) setJob(jobData);
-    if (taskData) setTasks(taskData);
-    if (varData) setLogVariables(jobVariablesToPending(varData));
-    if (memberData) setCrewMembers(memberData);
+    const errors = [jobResult.error, taskResult.error, varResult.error, memberResult.error].filter(Boolean);
+    if (errors.length) {
+      setFetchError(errors[0]!);
+      return;
+    }
+
+    if (jobResult.data) setJob(jobResult.data);
+    if (taskResult.data) setTasks(taskResult.data);
+    if (varResult.data) setLogVariables(jobVariablesToPending(varResult.data));
+    if (memberResult.data) setCrewMembers(memberResult.data);
   }
 
   async function autoCapture() {
@@ -256,6 +255,15 @@ export default function NewLogScreen() {
         </TouchableOpacity>
         <Text style={styles.title}>Log Work</Text>
       </View>
+
+      {fetchError && (
+        <View style={styles.fetchErrorBanner}>
+          <Text style={styles.fetchErrorText}>Failed to load job data: {fetchError}</Text>
+          <TouchableOpacity onPress={fetchJob}>
+            <Text style={styles.fetchErrorRetry}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
 
@@ -659,4 +667,19 @@ const styles = StyleSheet.create({
   },
   submitDisabled: { opacity: 0.6 },
   submitText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  fetchErrorBanner: {
+    backgroundColor: Colors.danger + '22', borderRadius: 12,
+    margin: 16, marginBottom: 0, padding: 16,
+    borderWidth: 1, borderColor: Colors.danger + '44', gap: 8,
+  },
+  fetchErrorText: { color: Colors.danger, fontSize: 14 },
+  fetchErrorRetry: { color: Colors.primary, fontWeight: '700', fontSize: 14 },
 });
+
+export default function NewLogScreenWithBoundary() {
+  return (
+    <ErrorBoundary fallbackTitle="Log form failed to load">
+      <NewLogScreen />
+    </ErrorBoundary>
+  );
+}

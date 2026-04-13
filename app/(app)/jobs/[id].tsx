@@ -7,10 +7,12 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { Job, DailyLog, Task, JobVariable, TaskVariable, getPaceColor, getForecastSentence } from '../../../types';
 import { Colors } from '../../../constants/Colors';
+import { ErrorBoundary } from '../../../components/ErrorBoundary';
+import { withRetryQuery } from '../../../lib/withRetry';
 import JobVariables, { jobVariablesToPending } from '../../../components/JobVariables';
 import TaskVariables from '../../../components/TaskVariables';
 
-export default function JobDetailScreen() {
+function JobDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
 
@@ -32,6 +34,7 @@ export default function JobDetailScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [jobVars, setJobVars] = useState<JobVariable[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskHours, setNewTaskHours] = useState('');
@@ -68,34 +71,34 @@ export default function JobDetailScreen() {
   useEffect(() => { if (id) fetchData(); }, [id]);
 
   async function fetchData() {
-    const [{ data: jobData }, { data: logData }, { data: taskData }, { data: varData }] =
-      await Promise.all([
-        supabase
-          .from('jobs')
-          .select('*, task_types(*), job_snapshots(*)')
-          .eq('id', id)
-          .single(),
-        supabase
-          .from('daily_logs')
-          .select('*, tasks(id, name)')
-          .eq('job_id', id)
-          .order('log_date', { ascending: false }),
-        supabase
-          .from('tasks')
-          .select('*, task_variables(*, job_variable_types(*))')
-          .eq('job_id', id)
-          .order('sequence_order'),
-        supabase
-          .from('job_variables')
-          .select('*, job_variable_types(*)')
-          .eq('job_id', id)
-          .order('created_at'),
-      ]);
-    if (jobData) setJob(jobData);
-    if (logData) setLogs(logData);
-    if (taskData) {
-      setTasks(taskData);
-      const grouped = (taskData as (Task & { task_variables?: TaskVariable[] })[]).reduce(
+    setFetchError(null);
+    const [jobResult, logResult, taskResult, varResult] = await Promise.all([
+      withRetryQuery(() =>
+        supabase.from('jobs').select('*, task_types(*), job_snapshots(*)').eq('id', id).single()
+      ),
+      withRetryQuery(() =>
+        supabase.from('daily_logs').select('*, tasks(id, name)').eq('job_id', id).order('log_date', { ascending: false })
+      ),
+      withRetryQuery(() =>
+        supabase.from('tasks').select('*, task_variables(*, job_variable_types(*))').eq('job_id', id).order('sequence_order')
+      ),
+      withRetryQuery(() =>
+        supabase.from('job_variables').select('*, job_variable_types(*)').eq('job_id', id).order('created_at')
+      ),
+    ]);
+
+    const errors = [jobResult.error, logResult.error, taskResult.error, varResult.error].filter(Boolean);
+    if (errors.length) {
+      setFetchError(errors[0]!);
+      setLoading(false);
+      return;
+    }
+
+    if (jobResult.data) setJob(jobResult.data);
+    if (logResult.data) setLogs(logResult.data);
+    if (taskResult.data) {
+      setTasks(taskResult.data);
+      const grouped = (taskResult.data as (Task & { task_variables?: TaskVariable[] })[]).reduce(
         (acc, t) => {
           if (t.task_variables?.length) acc[t.id] = t.task_variables;
           return acc;
@@ -104,7 +107,7 @@ export default function JobDetailScreen() {
       );
       setTaskVars(grouped);
     }
-    if (varData) setJobVars(varData);
+    if (varResult.data) setJobVars(varResult.data);
     setLoading(false);
   }
 
@@ -282,6 +285,24 @@ export default function JobDetailScreen() {
       else if (!data?.length) Alert.alert('Error', 'Permission denied — could not delete task.');
       else fetchData();
     });
+  }
+
+  if (fetchError) {
+    return (
+      <View style={styles.container}>
+        <View style={{ padding: 24, paddingTop: 60, gap: 12 }}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Text style={styles.backText}>← Back</Text>
+          </TouchableOpacity>
+          <View style={styles.fetchErrorBanner}>
+            <Text style={styles.fetchErrorText}>Failed to load job: {fetchError}</Text>
+            <TouchableOpacity onPress={fetchData}>
+              <Text style={styles.fetchErrorRetry}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
   }
 
   if (loading || !job) {
@@ -1099,4 +1120,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#ef444422', borderRadius: 8,
     padding: 10, borderWidth: 1, borderColor: '#ef4444',
   },
+  fetchErrorBanner: {
+    backgroundColor: Colors.danger + '22', borderRadius: 12,
+    padding: 16, borderWidth: 1, borderColor: Colors.danger + '44', gap: 8,
+  },
+  fetchErrorText: { color: Colors.danger, fontSize: 14 },
+  fetchErrorRetry: { color: Colors.primary, fontWeight: '700', fontSize: 14 },
 });
+
+export default function JobDetailScreenWithBoundary() {
+  return (
+    <ErrorBoundary fallbackTitle="Job failed to load">
+      <JobDetailScreen />
+    </ErrorBoundary>
+  );
+}
