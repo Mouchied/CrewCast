@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
-import { Link, useRouter } from 'expo-router';
+import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/Colors';
 import { Button } from '../../components/Button';
@@ -11,6 +11,7 @@ import { Input } from '../../components/Input';
 
 export default function SignupScreen() {
   const router = useRouter();
+  const { token } = useLocalSearchParams<{ token?: string }>();
   const [fullName, setFullName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [industry, setIndustry] = useState('');
@@ -54,7 +55,10 @@ export default function SignupScreen() {
     }
 
     setSuccess('Account created! Check your email to confirm your address, then sign in.');
-    setTimeout(() => router.replace('/(auth)/login'), 4000);
+    const loginDest = token
+      ? { pathname: '/(auth)/login' as const, params: { token } }
+      : '/(auth)/login' as const;
+    setTimeout(() => router.replace(loginDest), 4000);
   }
 
   return (
@@ -126,7 +130,12 @@ export default function SignupScreen() {
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>Already have an account? </Text>
-            <Link href="/(auth)/login" style={styles.link}>Sign in</Link>
+            <Link
+              href={token ? { pathname: '/(auth)/login', params: { token } } : '/(auth)/login'}
+              style={styles.link}
+            >
+              Sign in
+            </Link>
           </View>
         </View>
       </ScrollView>

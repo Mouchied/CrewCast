@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
-import { Link, useRouter } from 'expo-router';
+import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { Colors } from '../../constants/Colors';
 import { Button } from '../../components/Button';
@@ -11,6 +11,7 @@ import { Input } from '../../components/Input';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { token } = useLocalSearchParams<{ token?: string }>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,8 +26,13 @@ export default function LoginScreen() {
     setLoading(true);
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
-    if (authError) setError(authError.message);
-    else router.replace('/(app)');
+    if (authError) {
+      setError(authError.message);
+    } else if (token) {
+      router.replace({ pathname: '/(auth)/join', params: { token } });
+    } else {
+      router.replace('/(app)');
+    }
   }
 
   return (
@@ -69,7 +75,12 @@ export default function LoginScreen() {
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>Don't have an account? </Text>
-            <Link href="/(auth)/signup" style={styles.link}>Sign up</Link>
+            <Link
+              href={token ? { pathname: '/(auth)/signup', params: { token } } : '/(auth)/signup'}
+              style={styles.link}
+            >
+              Sign up
+            </Link>
           </View>
         </View>
       </ScrollView>

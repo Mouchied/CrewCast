@@ -24,7 +24,14 @@
         "backgroundColor": "#0f172a"
       },
       "package": "com.crewcast.app",
-      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [{ "scheme": "crewcast" }],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
