@@ -22,4 +22,7 @@ module.exports = {
   ],
   // Verbose output so failures are easy to read in CI
   verbose: true,
+  // Global setup: mock NativeAnimatedHelper so TouchableOpacity/Animated work in tests
+  setupFilesAfterFramework: ['./jest.setup.js'],
+  setupFiles: ['./jest.setup.js'],
 };
