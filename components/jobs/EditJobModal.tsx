@@ -4,9 +4,10 @@ import { Button } from '../Button';
 import { Input } from '../Input';
 import type { JobEditHook } from '../../hooks/useJobEdit';
 
-type Props = { hook: JobEditHook };
+type Props = { hook: JobEditHook; jobUnit?: string };
 
-export function EditJobModal({ hook }: Props) {
+export function EditJobModal({ hook, jobUnit }: Props) {
+  const unit = jobUnit || 'items';
   const {
     showEditJob, setShowEditJob,
     editName, setEditName,
@@ -37,7 +38,7 @@ export function EditJobModal({ hook }: Props) {
 
           <Input label="Job name *" value={editName} onChangeText={setEditName} placeholder="Job name" />
           <Input
-            label="Total units *"
+            label={`Total ${unit} *`}
             value={editTotalUnits}
             onChangeText={setEditTotalUnits}
             placeholder="e.g. 316"
@@ -65,13 +66,13 @@ export function EditJobModal({ hook }: Props) {
           <Text style={styles.hint}>Man-hours already burned before you started tracking in CrewCast. Used for accurate burn rate from day one.</Text>
 
           <Input
-            label="Units already completed (starting offset)"
+            label={`${unit.charAt(0).toUpperCase() + unit.slice(1)} already completed (starting offset)`}
             value={editStartingUnits}
             onChangeText={setEditStartingUnits}
             placeholder="e.g. 212"
             keyboardType="numeric"
           />
-          <Text style={styles.hint}>Rows/units done before you started logging. Progress bar and ETA will start from here.</Text>
+          <Text style={styles.hint}>{unit.charAt(0).toUpperCase() + unit.slice(1)} done before you started logging. Progress bar and ETA will start from here.</Text>
 
           <Input label="Bid crew size" value={editBidCrewSize} onChangeText={setEditBidCrewSize} placeholder="e.g. 4" keyboardType="numeric" />
           <Input label="Start date" value={editStartDate} onChangeText={setEditStartDate} placeholder="YYYY-MM-DD" />

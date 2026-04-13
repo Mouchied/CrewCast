@@ -26,15 +26,21 @@ export function LogRow({ log, unit, onDelete }: Props) {
               {log.weather_temp_f}°F · {log.weather_condition}
             </Text>
           )}
-          {log.percent_complete != null && (
-            <Text style={styles.metaText}>{log.percent_complete}% done</Text>
-          )}
         </View>
         {log.notes ? <Text style={styles.notes} numberOfLines={1}>{log.notes}</Text> : null}
       </View>
       <View style={styles.right}>
-        <Text style={styles.units}>{log.units_completed}</Text>
-        <Text style={styles.unitLabel}>{unit}</Text>
+        {log.percent_complete != null ? (
+          <>
+            <Text style={styles.units}>{log.percent_complete}%</Text>
+            <Text style={styles.unitLabel}>{log.units_completed} {unit}</Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.units}>{log.units_completed}</Text>
+            <Text style={styles.unitLabel}>{unit}</Text>
+          </>
+        )}
         <TouchableOpacity onPress={() => onDelete(log.id)} style={styles.delBtn}>
           <Text style={styles.delText}>✕</Text>
         </TouchableOpacity>

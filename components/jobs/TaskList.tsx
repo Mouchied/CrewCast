@@ -64,6 +64,12 @@ export function TaskList({
                 </Text>
                 {task.total_units != null && task.unit ? (
                   <View style={styles.taskProgressRow}>
+                    <Text style={styles.taskPct}>
+                      {Math.min(100, Math.round(((taskProgress[task.id] ?? 0) / task.total_units) * 100))}%
+                    </Text>
+                    <Text style={styles.taskMeta}>
+                      {(taskProgress[task.id] ?? 0).toFixed(0)} / {task.total_units} {task.unit}
+                    </Text>
                     <View style={styles.taskProgressBg}>
                       <View style={[
                         styles.taskProgressFill,
@@ -73,9 +79,6 @@ export function TaskList({
                         },
                       ]} />
                     </View>
-                    <Text style={styles.taskMeta}>
-                      {(taskProgress[task.id] ?? 0).toFixed(0)} / {task.total_units} {task.unit}
-                    </Text>
                   </View>
                 ) : task.estimated_hours != null ? (
                   <Text style={styles.taskMeta}>{task.estimated_hours} hrs estimated</Text>
@@ -202,6 +205,7 @@ const styles = StyleSheet.create({
   },
   taskVarChipLabel: { color: Colors.textMuted, fontSize: 10 },
   taskVarChipValue: { color: Colors.textSecondary, fontSize: 10, fontWeight: '600' },
+  taskPct: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
   taskProgressRow: { gap: 3, marginTop: 4 },
   taskProgressBg: { height: 4, borderRadius: 2, backgroundColor: Colors.bgInput, overflow: 'hidden' },
   taskProgressFill: { height: '100%', borderRadius: 2 },

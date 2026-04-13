@@ -59,6 +59,11 @@ export function JobCard({ job }: Props) {
       <View style={styles.progressBg}>
         <View style={[styles.progressFill, { width: `${pct}%` as any, backgroundColor: statusColor }]} />
       </View>
+      {snap && job.total_units > 0 && (
+        <Text style={styles.progressCount}>
+          {(snap.units_completed ?? 0).toFixed(0)} / {job.total_units} {job.unit || 'items'}
+        </Text>
+      )}
 
       {/* Stats row */}
       <View style={styles.statsRow}>
@@ -146,6 +151,7 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 3,
   },
+  progressCount: { fontSize: 12, color: Colors.textMuted, textAlign: 'center' },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
