@@ -11,6 +11,9 @@ import { ErrorBoundary } from '../../../components/ErrorBoundary';
 import { withRetryQuery } from '../../../lib/withRetry';
 import JobVariables, { jobVariablesToPending } from '../../../components/JobVariables';
 import TaskVariables from '../../../components/TaskVariables';
+import { Button } from '../../../components/Button';
+import { Input } from '../../../components/Input';
+import { Card } from '../../../components/Card';
 
 function JobDetailScreen() {
   const router = useRouter();
@@ -387,7 +390,7 @@ function JobDetailScreen() {
         )}
 
         {/* ── FORECAST CARD — the core value prop ── */}
-        <View style={[styles.forecastCard, { borderColor: paceColor + '44' }]}>
+        <Card style={[{ gap: 8 }, { borderColor: paceColor + '44' }]}>
           {forecastSentence ? (
             <Text style={styles.forecastSentence}>{forecastSentence}</Text>
           ) : (
@@ -413,7 +416,7 @@ function JobDetailScreen() {
               })}
             </Text>
           )}
-        </View>
+        </Card>
 
         {/* ── PROGRESS ── */}
         <View style={styles.section}>
@@ -466,7 +469,7 @@ function JobDetailScreen() {
 
         {/* ── EARNED VALUE / BURN RATE (only if bid_hours entered) ── */}
         {snap?.bid_hours != null && (
-          <View style={styles.evCard}>
+          <Card style={{ gap: 10 }}>
             <Text style={styles.sectionTitle}>Labor Budget Tracking</Text>
             <View style={styles.evRow}>
               <View style={styles.evItem}>
@@ -499,7 +502,7 @@ function JobDetailScreen() {
             <Text style={styles.evHint}>
               {snap.total_hours_worked?.toFixed(0) ?? 0} man-hours logged so far
             </Text>
-          </View>
+          </Card>
         )}
 
         {/* ── TASKS ── */}
@@ -662,12 +665,10 @@ function JobDetailScreen() {
         )}
 
         {/* Log daily button */}
-        <TouchableOpacity
-          style={styles.logBtn}
+        <Button
+          label="+ Log Work"
           onPress={() => router.push({ pathname: '/(app)/log/new', params: { jobId: id } })}
-        >
-          <Text style={styles.logBtnText}>+ Log Work</Text>
-        </TouchableOpacity>
+        />
 
         {/* Daily log history */}
         <View style={styles.section}>
@@ -693,51 +694,66 @@ function JobDetailScreen() {
           <ScrollView contentContainerStyle={styles.editModalSheet} keyboardShouldPersistTaps="handled">
             <Text style={styles.modalTitle}>Edit Job</Text>
 
-            <Text style={styles.editLabel}>Job name *</Text>
-            <TextInput style={styles.modalInput} value={editName} onChangeText={setEditName} placeholderTextColor={Colors.textMuted} placeholder="Job name" />
+            <Input label="Job name *" value={editName} onChangeText={setEditName} placeholder="Job name" />
 
-            <Text style={styles.editLabel}>Total units *</Text>
+            <Input
+              label="Total units *"
+              value={editTotalUnits}
+              onChangeText={setEditTotalUnits}
+              placeholder="e.g. 316"
+              keyboardType="numeric"
+            />
             <Text style={styles.editHint}>The total count of what you're building or installing — e.g. 316 panels, 500 ft of pipe, 24 homes. Every daily log tracks units completed against this number.</Text>
-            <TextInput style={styles.modalInput} value={editTotalUnits} onChangeText={setEditTotalUnits} placeholderTextColor={Colors.textMuted} placeholder="e.g. 316" keyboardType="numeric" />
 
-            <Text style={styles.editLabel}>Default crew size</Text>
-            <TextInput style={styles.modalInput} value={editCrewSize} onChangeText={setEditCrewSize} placeholderTextColor={Colors.textMuted} placeholder="e.g. 4" keyboardType="numeric" />
+            <Input label="Default crew size" value={editCrewSize} onChangeText={setEditCrewSize} placeholder="e.g. 4" keyboardType="numeric" />
 
-            <Text style={styles.editLabel}>Bid man-hours</Text>
+            <Input
+              label="Bid man-hours"
+              value={editBidHours}
+              onChangeText={setEditBidHours}
+              placeholder="e.g. 1584"
+              keyboardType="numeric"
+            />
             <Text style={styles.editHint}>Total labor hours in your bid/contract for this job.</Text>
-            <TextInput style={styles.modalInput} value={editBidHours} onChangeText={setEditBidHours} placeholderTextColor={Colors.textMuted} placeholder="e.g. 1584" keyboardType="numeric" />
 
-            <Text style={styles.editLabel}>Hours already used (starting offset)</Text>
+            <Input
+              label="Hours already used (starting offset)"
+              value={editStartingHours}
+              onChangeText={setEditStartingHours}
+              placeholder="e.g. 320"
+              keyboardType="numeric"
+            />
             <Text style={styles.editHint}>Man-hours already burned before you started tracking in CrewCast. Used for accurate burn rate from day one.</Text>
-            <TextInput style={styles.modalInput} value={editStartingHours} onChangeText={setEditStartingHours} placeholderTextColor={Colors.textMuted} placeholder="e.g. 320" keyboardType="numeric" />
 
-            <Text style={styles.editLabel}>Units already completed (starting offset)</Text>
+            <Input
+              label="Units already completed (starting offset)"
+              value={editStartingUnits}
+              onChangeText={setEditStartingUnits}
+              placeholder="e.g. 212"
+              keyboardType="numeric"
+            />
             <Text style={styles.editHint}>Rows/units done before you started logging. Progress bar and ETA will start from here.</Text>
-            <TextInput style={styles.modalInput} value={editStartingUnits} onChangeText={setEditStartingUnits} placeholderTextColor={Colors.textMuted} placeholder="e.g. 212" keyboardType="numeric" />
 
-            <Text style={styles.editLabel}>Bid crew size</Text>
-            <TextInput style={styles.modalInput} value={editBidCrewSize} onChangeText={setEditBidCrewSize} placeholderTextColor={Colors.textMuted} placeholder="e.g. 4" keyboardType="numeric" />
-
-            <Text style={styles.editLabel}>Start date</Text>
-            <TextInput style={styles.modalInput} value={editStartDate} onChangeText={setEditStartDate} placeholderTextColor={Colors.textMuted} placeholder="YYYY-MM-DD" />
-
-            <Text style={styles.editLabel}>Target end date</Text>
-            <TextInput style={styles.modalInput} value={editTargetEndDate} onChangeText={setEditTargetEndDate} placeholderTextColor={Colors.textMuted} placeholder="YYYY-MM-DD" />
-
-            <Text style={styles.editLabel}>Location name</Text>
-            <TextInput style={styles.modalInput} value={editLocationName} onChangeText={setEditLocationName} placeholderTextColor={Colors.textMuted} placeholder="e.g. Midland, TX" />
-
-            <Text style={styles.editLabel}>Notes</Text>
-            <TextInput style={[styles.modalInput, { minHeight: 70, textAlignVertical: 'top' }]} value={editNotes} onChangeText={setEditNotes} placeholderTextColor={Colors.textMuted} placeholder="Any notes…" multiline />
+            <Input label="Bid crew size" value={editBidCrewSize} onChangeText={setEditBidCrewSize} placeholder="e.g. 4" keyboardType="numeric" />
+            <Input label="Start date" value={editStartDate} onChangeText={setEditStartDate} placeholder="YYYY-MM-DD" />
+            <Input label="Target end date" value={editTargetEndDate} onChangeText={setEditTargetEndDate} placeholder="YYYY-MM-DD" />
+            <Input label="Location name" value={editLocationName} onChangeText={setEditLocationName} placeholder="e.g. Midland, TX" />
+            <Input label="Notes" value={editNotes} onChangeText={setEditNotes} placeholder="Any notes…" multiline style={{ minHeight: 70, textAlignVertical: 'top' }} />
 
             {!!editJobError && <Text style={styles.inlineError}>{editJobError}</Text>}
             <View style={styles.modalBtns}>
-              <TouchableOpacity style={styles.modalCancel} onPress={() => { setShowEditJob(false); setEditJobError(''); }}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalSave, editSaving && { opacity: 0.6 }]} onPress={saveEditJob} disabled={editSaving}>
-                <Text style={styles.modalSaveText}>{editSaving ? 'Saving…' : 'Save Changes'}</Text>
-              </TouchableOpacity>
+              <Button
+                label="Cancel"
+                variant="secondary"
+                onPress={() => { setShowEditJob(false); setEditJobError(''); }}
+                style={{ flex: 1 }}
+              />
+              <Button
+                label="Save Changes"
+                onPress={saveEditJob}
+                loading={editSaving}
+                style={{ flex: 1 }}
+              />
             </View>
             <View style={{ height: 40 }} />
           </ScrollView>
@@ -754,50 +770,20 @@ function JobDetailScreen() {
         <View style={styles.modalOverlay}>
           <ScrollView contentContainerStyle={styles.modalSheet} keyboardShouldPersistTaps="handled">
             <Text style={styles.modalTitle}>Edit Task</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={editTaskName}
-              onChangeText={setEditTaskName}
-              placeholder="Task name"
-              placeholderTextColor={Colors.textMuted}
-              autoFocus
-            />
+            <Input value={editTaskName} onChangeText={setEditTaskName} placeholder="Task name" autoFocus />
             <View style={styles.taskUnitRow}>
-              <TextInput
-                style={[styles.modalInput, { flex: 1 }]}
-                value={editTaskTotalUnits}
-                onChangeText={setEditTaskTotalUnits}
-                placeholder="Total (e.g. 316)"
-                placeholderTextColor={Colors.textMuted}
-                keyboardType="numeric"
-              />
-              <TextInput
-                style={[styles.modalInput, { flex: 1 }]}
-                value={editTaskUnit}
-                onChangeText={setEditTaskUnit}
-                placeholder="Unit (e.g. rows)"
-                placeholderTextColor={Colors.textMuted}
-              />
+              <View style={{ flex: 1 }}>
+                <Input value={editTaskTotalUnits} onChangeText={setEditTaskTotalUnits} placeholder="Total (e.g. 316)" keyboardType="numeric" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Input value={editTaskUnit} onChangeText={setEditTaskUnit} placeholder="Unit (e.g. rows)" />
+              </View>
             </View>
             <Text style={styles.taskUnitHint}>
               Set the count this task is measured by — rows, combiners, feet, sets, etc.
             </Text>
-            <TextInput
-              style={styles.modalInput}
-              value={editTaskHours}
-              onChangeText={setEditTaskHours}
-              placeholder="Budgeted man-hours for this task (optional)"
-              placeholderTextColor={Colors.textMuted}
-              keyboardType="numeric"
-            />
-            <TextInput
-              style={styles.modalInput}
-              value={editTaskStartingUnits}
-              onChangeText={setEditTaskStartingUnits}
-              placeholder="Units already done before tracking (optional)"
-              placeholderTextColor={Colors.textMuted}
-              keyboardType="numeric"
-            />
+            <Input value={editTaskHours} onChangeText={setEditTaskHours} placeholder="Budgeted man-hours for this task (optional)" keyboardType="numeric" />
+            <Input value={editTaskStartingUnits} onChangeText={setEditTaskStartingUnits} placeholder="Units already done before tracking (optional)" keyboardType="numeric" />
 
             <Text style={[styles.editLabel, { marginTop: 16 }]}>Variables</Text>
             <Text style={styles.editHint}>
@@ -812,15 +798,13 @@ function JobDetailScreen() {
 
             {!!editTaskError && <Text style={styles.inlineError}>{editTaskError}</Text>}
             <View style={styles.modalBtns}>
-              <TouchableOpacity
-                style={styles.modalCancel}
+              <Button
+                label="Cancel"
+                variant="secondary"
                 onPress={() => { setShowEditTask(false); setEditTaskError(''); }}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSave} onPress={saveEditTask}>
-                <Text style={styles.modalSaveText}>Save Task</Text>
-              </TouchableOpacity>
+                style={{ flex: 1 }}
+              />
+              <Button label="Save Task" onPress={saveEditTask} style={{ flex: 1 }} />
             </View>
           </ScrollView>
         </View>
@@ -836,61 +820,29 @@ function JobDetailScreen() {
         <View style={styles.modalOverlay}>
           <ScrollView contentContainerStyle={styles.modalSheet} keyboardShouldPersistTaps="handled">
             <Text style={styles.modalTitle}>Add Task</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={newTaskName}
-              onChangeText={setNewTaskName}
-              placeholder="Task name (e.g. Plug mods)"
-              placeholderTextColor={Colors.textMuted}
-              autoFocus
-            />
+            <Input value={newTaskName} onChangeText={setNewTaskName} placeholder="Task name (e.g. Plug mods)" autoFocus />
             <View style={styles.taskUnitRow}>
-              <TextInput
-                style={[styles.modalInput, { flex: 1 }]}
-                value={newTaskTotalUnits}
-                onChangeText={setNewTaskTotalUnits}
-                placeholder="Total (e.g. 316)"
-                placeholderTextColor={Colors.textMuted}
-                keyboardType="numeric"
-              />
-              <TextInput
-                style={[styles.modalInput, { flex: 1 }]}
-                value={newTaskUnit}
-                onChangeText={setNewTaskUnit}
-                placeholder="Unit (e.g. rows)"
-                placeholderTextColor={Colors.textMuted}
-              />
+              <View style={{ flex: 1 }}>
+                <Input value={newTaskTotalUnits} onChangeText={setNewTaskTotalUnits} placeholder="Total (e.g. 316)" keyboardType="numeric" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Input value={newTaskUnit} onChangeText={setNewTaskUnit} placeholder="Unit (e.g. rows)" />
+              </View>
             </View>
             <Text style={styles.taskUnitHint}>
               Set the count this task is measured by — rows, combiners, feet, sets, etc.
             </Text>
-            <TextInput
-              style={styles.modalInput}
-              value={newTaskHours}
-              onChangeText={setNewTaskHours}
-              placeholder="Budgeted man-hours for this task (optional)"
-              placeholderTextColor={Colors.textMuted}
-              keyboardType="numeric"
-            />
-            <TextInput
-              style={styles.modalInput}
-              value={newTaskStartingUnits}
-              onChangeText={setNewTaskStartingUnits}
-              placeholder="Units already done before tracking (optional)"
-              placeholderTextColor={Colors.textMuted}
-              keyboardType="numeric"
-            />
+            <Input value={newTaskHours} onChangeText={setNewTaskHours} placeholder="Budgeted man-hours for this task (optional)" keyboardType="numeric" />
+            <Input value={newTaskStartingUnits} onChangeText={setNewTaskStartingUnits} placeholder="Units already done before tracking (optional)" keyboardType="numeric" />
             {!!addTaskError && <Text style={styles.inlineError}>{addTaskError}</Text>}
             <View style={styles.modalBtns}>
-              <TouchableOpacity
-                style={styles.modalCancel}
+              <Button
+                label="Cancel"
+                variant="secondary"
                 onPress={() => { setShowAddTask(false); setAddTaskError(''); }}
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSave} onPress={addTask}>
-                <Text style={styles.modalSaveText}>Add Task</Text>
-              </TouchableOpacity>
+                style={{ flex: 1 }}
+              />
+              <Button label="Add Task" onPress={addTask} style={{ flex: 1 }} />
             </View>
           </ScrollView>
         </View>
@@ -1017,10 +969,6 @@ const styles = StyleSheet.create({
   location: { fontSize: 14, color: Colors.textSecondary },
   taskType: { fontSize: 13, color: Colors.primary, fontWeight: '600' },
 
-  forecastCard: {
-    backgroundColor: Colors.bgCard, borderRadius: 14,
-    padding: 18, gap: 8, borderWidth: 1,
-  },
   forecastSentence: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary, lineHeight: 26 },
   forecastPending: { fontSize: 15, color: Colors.textMuted, fontStyle: 'italic' },
   etaDetail: { fontSize: 14, color: Colors.textSecondary },
@@ -1038,10 +986,6 @@ const styles = StyleSheet.create({
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   mutedText: { color: Colors.textMuted, fontSize: 14, lineHeight: 21 },
 
-  evCard: {
-    backgroundColor: Colors.bgCard, borderRadius: 14,
-    padding: 16, gap: 10, borderWidth: 1, borderColor: Colors.border,
-  },
   evRow: { flexDirection: 'row', justifyContent: 'space-between' },
   evItem: { alignItems: 'center', flex: 1 },
   evValue: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary },
@@ -1085,11 +1029,6 @@ const styles = StyleSheet.create({
   reorderBtn: { padding: 2 },
   reorderBtnText: { fontSize: 10, color: Colors.textMuted },
 
-  logBtn: {
-    backgroundColor: Colors.primary, borderRadius: 14,
-    padding: 18, alignItems: 'center',
-  },
-  logBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 
   modalOverlay: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.7)',
@@ -1100,21 +1039,7 @@ const styles = StyleSheet.create({
     padding: 24, gap: 14,
   },
   modalTitle: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary },
-  modalInput: {
-    backgroundColor: Colors.bgInput, borderRadius: 12, padding: 16,
-    color: Colors.textPrimary, fontSize: 16, borderWidth: 1, borderColor: Colors.border,
-  },
   modalBtns: { flexDirection: 'row', gap: 12 },
-  modalCancel: {
-    flex: 1, borderRadius: 12, padding: 16, alignItems: 'center',
-    backgroundColor: Colors.bgInput, borderWidth: 1, borderColor: Colors.border,
-  },
-  modalCancelText: { color: Colors.textSecondary, fontWeight: '700' },
-  modalSave: {
-    flex: 1, borderRadius: 12, padding: 16, alignItems: 'center',
-    backgroundColor: Colors.primary,
-  },
-  modalSaveText: { color: '#fff', fontWeight: '700' },
   inlineError: {
     color: '#ef4444', fontSize: 13, fontWeight: '600',
     backgroundColor: '#ef444422', borderRadius: 8,

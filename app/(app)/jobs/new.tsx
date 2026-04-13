@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  View, Text, TouchableOpacity, StyleSheet,
   ScrollView, Alert, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -11,6 +11,8 @@ import { TaskType } from '../../../types';
 import { Colors } from '../../../constants/Colors';
 import { reverseGeocode } from '../../../lib/weather';
 import JobVariables, { PendingVariable } from '../../../components/JobVariables';
+import { Button } from '../../../components/Button';
+import { Input } from '../../../components/Input';
 
 export default function NewJobScreen() {
   const router = useRouter();
@@ -178,13 +180,11 @@ export default function NewJobScreen() {
       <ScrollView contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionLabel}>JOB INFO</Text>
 
-        <Text style={styles.label}>Job name *</Text>
-        <TextInput
-          style={styles.input}
+        <Input
+          label="Job name *"
           value={name}
           onChangeText={setName}
           placeholder="e.g. Midland Ranch Solar — Phase 2"
-          placeholderTextColor={Colors.textMuted}
         />
 
         <Text style={styles.label}>Work type *</Text>
@@ -222,21 +222,17 @@ export default function NewJobScreen() {
 
         {showCustomTask && (
           <>
-            <Text style={styles.label}>Custom task name *</Text>
-            <TextInput
-              style={styles.input}
+            <Input
+              label="Custom task name *"
               value={customTask}
               onChangeText={setCustomTask}
               placeholder="e.g. String inverter installation"
-              placeholderTextColor={Colors.textMuted}
             />
-            <Text style={styles.label}>Unit of measure *</Text>
-            <TextInput
-              style={styles.input}
+            <Input
+              label="Unit of measure *"
               value={customUnit}
               onChangeText={setCustomUnit}
               placeholder="e.g. inverters, feet, panels…"
-              placeholderTextColor={Colors.textMuted}
             />
           </>
         )}
@@ -260,23 +256,19 @@ export default function NewJobScreen() {
           </Text>
         </View>
 
-        <Text style={styles.label}>Man-hours already burned (if starting mid-job)</Text>
-        <TextInput
-          style={styles.input}
+        <Input
+          label="Man-hours already burned (if starting mid-job)"
           value={startingHours}
           onChangeText={setStartingHours}
           placeholder="e.g. 160  (leave blank if starting fresh)"
-          placeholderTextColor={Colors.textMuted}
           keyboardType="numeric"
         />
 
-        <Text style={styles.label}>Default crew size</Text>
-        <TextInput
-          style={styles.input}
+        <Input
+          label="Default crew size"
           value={crewSize}
           onChangeText={setCrewSize}
           placeholder="e.g. 4"
-          placeholderTextColor={Colors.textMuted}
           keyboardType="numeric"
         />
 
@@ -301,45 +293,37 @@ export default function NewJobScreen() {
           if you're over or under budget.
         </Text>
 
-        <Text style={styles.label}>Bid man-hours (total)</Text>
-        <TextInput
-          style={styles.input}
+        <Input
+          label="Bid man-hours (total)"
           value={bidHours}
           onChangeText={setBidHours}
           placeholder="e.g. 320  (4 crew × 10 days × 8 hrs)"
-          placeholderTextColor={Colors.textMuted}
           keyboardType="numeric"
         />
 
-        <Text style={styles.label}>Bid crew size assumed</Text>
-        <TextInput
-          style={styles.input}
+        <Input
+          label="Bid crew size assumed"
           value={bidCrewSize}
           onChangeText={setBidCrewSize}
           placeholder="e.g. 4"
-          placeholderTextColor={Colors.textMuted}
           keyboardType="numeric"
         />
 
         {/* ── Dates ───────────────────────────────────────── */}
         <Text style={styles.sectionLabel}>DATES</Text>
 
-        <Text style={styles.label}>Start date *</Text>
-        <TextInput
-          style={styles.input}
+        <Input
+          label="Start date *"
           value={startDate}
           onChangeText={setStartDate}
           placeholder="YYYY-MM-DD"
-          placeholderTextColor={Colors.textMuted}
         />
 
-        <Text style={styles.label}>Target / bid end date</Text>
-        <TextInput
-          style={styles.input}
+        <Input
+          label="Target / bid end date"
           value={targetEndDate}
           onChangeText={setTargetEndDate}
           placeholder="YYYY-MM-DD"
-          placeholderTextColor={Colors.textMuted}
         />
 
         {/* ── Location ────────────────────────────────────── */}
@@ -362,27 +346,24 @@ export default function NewJobScreen() {
           </View>
         ) : null}
 
-        <Text style={styles.label}>Location name (or enter manually)</Text>
-        <TextInput
-          style={styles.input}
+        <Input
+          label="Location name (or enter manually)"
           value={locationName}
           onChangeText={setLocationName}
           placeholder="e.g. Midland, TX"
-          placeholderTextColor={Colors.textMuted}
         />
 
         {/* ── Notes ───────────────────────────────────────── */}
         <Text style={styles.sectionLabel}>NOTES</Text>
 
-        <Text style={styles.label}>General notes</Text>
-        <TextInput
-          style={[styles.input, styles.textarea]}
+        <Input
+          label="General notes"
           value={notes}
           onChangeText={setNotes}
           placeholder="Any other context about this job…"
-          placeholderTextColor={Colors.textMuted}
           multiline
           numberOfLines={3}
+          style={styles.textarea}
         />
 
         {formErrors.length > 0 && (
@@ -393,15 +374,12 @@ export default function NewJobScreen() {
           </View>
         )}
 
-        <TouchableOpacity
-          style={[styles.submitBtn, submitting && styles.submitDisabled]}
+        <Button
+          label="Create Job"
           onPress={handleSubmit}
-          disabled={submitting}
-        >
-          <Text style={styles.submitText}>
-            {submitting ? 'Creating job…' : 'Create Job'}
-          </Text>
-        </TouchableOpacity>
+          loading={submitting}
+          style={styles.submitBtn}
+        />
 
         <View style={{ height: 60 }} />
       </ScrollView>
@@ -424,13 +402,7 @@ const styles = StyleSheet.create({
     color: Colors.textMuted, fontSize: 11, fontWeight: '700',
     letterSpacing: 1.2, marginTop: 16, marginBottom: -2,
   },
-  label: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600', marginBottom: -4 },
-  input: {
-    backgroundColor: Colors.bgInput,
-    borderRadius: 12, padding: 16,
-    color: Colors.textPrimary, fontSize: 16,
-    borderWidth: 1, borderColor: Colors.border,
-  },
+  label: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600' },
   textarea: { minHeight: 80, textAlignVertical: 'top' },
   chipGrid: {
     flexDirection: 'row', flexWrap: 'wrap',
@@ -457,12 +429,7 @@ const styles = StyleSheet.create({
     padding: 12, borderWidth: 1, borderColor: Colors.primary + '44',
   },
   locationText: { color: Colors.primary, fontWeight: '600' },
-  submitBtn: {
-    backgroundColor: Colors.primary, borderRadius: 12,
-    padding: 18, alignItems: 'center', marginTop: 16,
-  },
-  submitDisabled: { opacity: 0.6 },
-  submitText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  submitBtn: { marginTop: 16 },
   errorBox: {
     backgroundColor: '#ef444422', borderRadius: 10,
     padding: 12, borderWidth: 1, borderColor: '#ef4444',

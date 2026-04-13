@@ -13,6 +13,9 @@ import { ErrorBoundary } from '../../../components/ErrorBoundary';
 import { withRetryQuery } from '../../../lib/withRetry';
 import { fetchWeather } from '../../../lib/weather';
 import JobVariables, { PendingVariable, jobVariablesToPending } from '../../../components/JobVariables';
+import { Button } from '../../../components/Button';
+import { Input } from '../../../components/Input';
+import { Card } from '../../../components/Card';
 
 type TaskEntry = {
   localId: string;
@@ -269,7 +272,7 @@ function NewLogScreen() {
 
         {/* Job context */}
         {job && (
-          <View style={styles.jobContext}>
+          <Card style={{ gap: 8 }}>
             <Text style={styles.jobName}>{job.name}</Text>
             {job.location_name ? (
               <Text style={styles.jobLocation}>{job.location_name}</Text>
@@ -280,21 +283,19 @@ function NewLogScreen() {
             <Text style={styles.progressText}>
               {snap?.units_completed?.toFixed(0) ?? 0} / {job.total_units} {job.unit} complete
             </Text>
-          </View>
+          </Card>
         )}
 
         {/* Date */}
-        <Text style={styles.label}>Date *</Text>
-        <TextInput
-          style={styles.input}
+        <Input
+          label="Date *"
           value={logDate}
           onChangeText={setLogDate}
           placeholder="YYYY-MM-DD"
-          placeholderTextColor={Colors.textMuted}
         />
 
         {/* Weather */}
-        <View style={styles.weatherCard}>
+        <Card style={styles.weatherCard}>
           <Text style={styles.weatherTitle}>Weather & Location</Text>
           {locating ? (
             <View style={styles.weatherRow}>
@@ -324,7 +325,7 @@ function NewLogScreen() {
               📍 {latitude.toFixed(4)}, {longitude?.toFixed(4)}
             </Text>
           )}
-        </View>
+        </Card>
 
         {/* Job conditions */}
         <Text style={styles.sectionLabel}>TODAY'S CONDITIONS</Text>
@@ -368,34 +369,30 @@ function NewLogScreen() {
         {/* ── Shared details ───────────────────────────────── */}
         <Text style={styles.sectionLabel}>DETAILS</Text>
 
-        <Text style={styles.label}>Foreman's % complete estimate (optional)</Text>
-        <TextInput
-          style={styles.input}
+        <Input
+          label="Foreman's % complete estimate (optional)"
           value={percentComplete}
           onChangeText={setPercentComplete}
           placeholder="e.g. 45  (gut feel on overall job progress)"
-          placeholderTextColor={Colors.textMuted}
           keyboardType="numeric"
         />
 
-        <Text style={styles.label}>Notes</Text>
-        <TextInput
-          style={[styles.input, styles.textarea]}
+        <Input
+          label="Notes"
           value={notes}
           onChangeText={setNotes}
           placeholder="Anything notable? Delays, conditions, equipment issues…"
-          placeholderTextColor={Colors.textMuted}
           multiline
           numberOfLines={3}
+          style={styles.textarea}
         />
 
-        <TouchableOpacity
-          style={[styles.submitBtn, submitting && styles.submitDisabled]}
+        <Button
+          label="Save Log"
           onPress={handleSubmit}
-          disabled={submitting}
-        >
-          <Text style={styles.submitText}>{submitting ? 'Saving…' : 'Save Log'}</Text>
-        </TouchableOpacity>
+          loading={submitting}
+          style={{ marginTop: 16 }}
+        />
 
         <View style={{ height: 60 }} />
       </ScrollView>
@@ -432,7 +429,7 @@ function TaskEntryCard({
     : 'Units completed *';
 
   return (
-    <View style={cardStyles.card}>
+    <Card style={{ gap: 10 }}>
       <View style={cardStyles.cardHeader}>
         <Text style={cardStyles.cardTitle}>Task {index + 1}</Text>
         {canRemove && (
@@ -474,21 +471,19 @@ function TaskEntryCard({
       )}
 
       {/* Units completed */}
-      <Text style={cardStyles.label}>{unitLabel}</Text>
       {activeTask?.total_units != null && (
         <Text style={cardStyles.hint}>
           {activeTask.name} — {activeTask.total_units} total units for this task
         </Text>
       )}
-      <TextInput
-        style={[cardStyles.input, !!error && cardStyles.inputError]}
+      <Input
+        label={unitLabel}
         value={entry.unitsCompleted}
         onChangeText={val => { onUpdateEntry({ unitsCompleted: val }); onClearError(); }}
         placeholder={`e.g. ${snap?.avg_units_per_day?.toFixed(0) ?? '12'}`}
-        placeholderTextColor={Colors.textMuted}
         keyboardType="numeric"
+        error={error || undefined}
       />
-      {!!error && <Text style={cardStyles.errorText}>{error}</Text>}
 
       {/* Crew for this task */}
       <Text style={cardStyles.label}>Crew on this task</Text>
@@ -530,16 +525,14 @@ function TaskEntryCard({
       )}
 
       {/* Hours for this task */}
-      <Text style={cardStyles.label}>Hours worked on this task</Text>
-      <TextInput
-        style={cardStyles.input}
+      <Input
+        label="Hours worked on this task"
         value={entry.hoursWorked}
         onChangeText={val => onUpdateEntry({ hoursWorked: val })}
         placeholder="e.g. 32  (4 crew × 8 hrs)"
-        placeholderTextColor={Colors.textMuted}
         keyboardType="numeric"
       />
-    </View>
+    </Card>
   );
 }
 
@@ -559,10 +552,6 @@ const wStyles = StyleSheet.create({
 });
 
 const cardStyles = StyleSheet.create({
-  card: {
-    backgroundColor: Colors.bgCard, borderRadius: 16,
-    padding: 16, gap: 10, borderWidth: 1, borderColor: Colors.border,
-  },
   cardHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
@@ -581,12 +570,6 @@ const cardStyles = StyleSheet.create({
   taskChipSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   taskChipText: { color: Colors.textSecondary, fontWeight: '600', fontSize: 13 },
   taskChipTextSelected: { color: '#fff' },
-  input: {
-    backgroundColor: Colors.bgInput, borderRadius: 12, padding: 16,
-    color: Colors.textPrimary, fontSize: 16, borderWidth: 1, borderColor: Colors.border,
-  },
-  inputError: { borderColor: '#ef4444' },
-  errorText: { color: '#ef4444', fontSize: 13, fontWeight: '600', marginTop: -4 },
   noCrewText: { color: Colors.textMuted, fontSize: 13, fontStyle: 'italic' },
   crewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   crewChip: {
@@ -620,10 +603,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '800', color: Colors.textPrimary },
   form: { padding: 20, gap: 10 },
 
-  jobContext: {
-    backgroundColor: Colors.bgCard, borderRadius: 14,
-    padding: 16, gap: 8, borderWidth: 1, borderColor: Colors.border,
-  },
   jobName: { fontSize: 17, fontWeight: '700', color: Colors.textPrimary },
   jobLocation: { fontSize: 13, color: Colors.textSecondary },
   progressBg: { height: 6, borderRadius: 3, backgroundColor: Colors.bgInput, overflow: 'hidden' },
@@ -631,8 +610,7 @@ const styles = StyleSheet.create({
   progressText: { fontSize: 12, color: Colors.textMuted },
 
   weatherCard: {
-    backgroundColor: Colors.bgCard, borderRadius: 14,
-    padding: 16, gap: 10, borderWidth: 1, borderColor: Colors.border,
+    gap: 10,
   },
   weatherTitle: { fontSize: 13, fontWeight: '700', color: Colors.textSecondary, letterSpacing: 0.5 },
   weatherRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -649,10 +627,6 @@ const styles = StyleSheet.create({
   },
   label: { color: Colors.textSecondary, fontSize: 13, fontWeight: '600', marginBottom: -4 },
   hint: { color: Colors.textMuted, fontSize: 12, marginTop: -2, lineHeight: 18 },
-  input: {
-    backgroundColor: Colors.bgInput, borderRadius: 12, padding: 16,
-    color: Colors.textPrimary, fontSize: 16, borderWidth: 1, borderColor: Colors.border,
-  },
   textarea: { minHeight: 80, textAlignVertical: 'top' },
 
   addTaskBtn: {
@@ -661,12 +635,6 @@ const styles = StyleSheet.create({
   },
   addTaskText: { color: Colors.primary, fontWeight: '700', fontSize: 14 },
 
-  submitBtn: {
-    backgroundColor: Colors.primary, borderRadius: 12,
-    padding: 18, alignItems: 'center', marginTop: 16,
-  },
-  submitDisabled: { opacity: 0.6 },
-  submitText: { color: '#fff', fontWeight: '700', fontSize: 16 },
   fetchErrorBanner: {
     backgroundColor: Colors.danger + '22', borderRadius: 12,
     margin: 16, marginBottom: 0, padding: 16,
