@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Switch,
+  View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform, Share,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
@@ -24,6 +24,8 @@ export default function SettingsScreen() {
   const [crewMembers, setCrewMembers] = useState<CrewMember[]>([]);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviting, setInviting] = useState(false);
+  const [inviteLink, setInviteLink] = useState('');
+  const [inviteLinkCopied, setInviteLinkCopied] = useState(false);
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskUnit, setNewTaskUnit] = useState('');
   const [addingTask, setAddingTask] = useState(false);
@@ -78,26 +80,57 @@ export default function SettingsScreen() {
     if (crewData) setCrewMembers(crewData);
   }
 
+  function buildJoinUrl(token: string): string {
+    const webUrl = process.env.EXPO_PUBLIC_WEB_URL;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      return `${window.location.origin}/join?token=${token}`;
+    }
+    if (webUrl) {
+      return `${webUrl}/join?token=${token}`;
+    }
+    return `crewcast://join?token=${token}`;
+  }
+
   async function sendInvite() {
     if (!inviteEmail.trim()) { setInviteError('Missing: email address is required'); return; }
     if (!profile?.company_id) return;
     setInviteError('');
+    setInviteLinkCopied(false);
+    setInviteLink('');
     setInviting(true);
 
-    const { error } = await supabase.from('company_invitations').insert({
-      company_id: profile.company_id,
-      invited_by: profile.id,
-      email: inviteEmail.trim().toLowerCase(),
-      role: 'foreman',
-    });
+    const { data, error } = await supabase
+      .from('company_invitations')
+      .insert({
+        company_id: profile.company_id,
+        invited_by: profile.id,
+        email: inviteEmail.trim().toLowerCase(),
+        role: 'foreman',
+      })
+      .select('token')
+      .single();
 
     setInviting(false);
     if (error) {
       showToast('error', error.message);
     } else {
       setInviteEmail('');
-      showToast('success', `Invite created for ${inviteEmail}. Share it with them to join.`);
+      setInviteLink(buildJoinUrl(data.token));
     }
+  }
+
+  async function shareInviteLink() {
+    if (Platform.OS === 'web') {
+      try {
+        await navigator.clipboard.writeText(inviteLink);
+        setInviteLinkCopied(true);
+        setTimeout(() => setInviteLinkCopied(false), 2500);
+      } catch {
+        // fallback: text is selectable
+      }
+      return;
+    }
+    await Share.share({ message: `Join my team on CrewCast: ${inviteLink}`, url: inviteLink });
   }
 
   async function addCustomTaskType() {
@@ -290,6 +323,19 @@ export default function SettingsScreen() {
               </TouchableOpacity>
             </View>
             {!!inviteError && <Text style={styles.inlineError}>{inviteError}</Text>}
+            {!!inviteLink && (
+              <View style={styles.inviteLinkBox}>
+                <Text style={styles.inviteLinkLabel}>Share this link:</Text>
+                <Text style={styles.inviteLinkUrl} numberOfLines={2} selectable>
+                  {inviteLink}
+                </Text>
+                <TouchableOpacity style={styles.copyBtn} onPress={shareInviteLink}>
+                  <Text style={styles.copyBtnText}>
+                    {inviteLinkCopied ? '✓ Copied' : Platform.OS === 'web' ? 'Copy Link' : 'Share Link'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </Card>
         </View>
 
@@ -514,4 +560,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#ef444422', borderRadius: 8,
     padding: 10, borderWidth: 1, borderColor: '#ef4444',
   },
+
+  inviteLinkBox: {
+    backgroundColor: Colors.primary + '11',
+    borderRadius: 10,
+    padding: 12,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: Colors.primary + '33',
+  },
+  inviteLinkLabel: { fontSize: 12, fontWeight: '700', color: Colors.primary },
+  inviteLinkUrl: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  copyBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginTop: 4,
+  },
+  copyBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 });
