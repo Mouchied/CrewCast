@@ -253,7 +253,7 @@ export default function NewJobScreen() {
 
         <View style={styles.infoRow}>
           <Text style={styles.infoText}>
-            Progress is tracked per task — set units and starting counts when you add tasks after creating the job.
+            Progress is tracked per task — set counts and starting values when you add tasks after creating the job.
           </Text>
         </View>
 

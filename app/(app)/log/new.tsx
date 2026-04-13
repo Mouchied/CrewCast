@@ -160,7 +160,7 @@ function NewLogScreen() {
         const label = entry.taskId
           ? (tasks.find(t => t.id === entry.taskId)?.name ?? 'task')
           : 'general work';
-        errors[entry.localId] = `Missing: units completed for "${label}"`;
+        errors[entry.localId] = `Missing: items completed for "${label}"`;
       }
     }
     if (Object.keys(errors).length > 0) {
