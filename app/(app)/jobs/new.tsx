@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, ActivityIndicator,
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  ScrollView, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
@@ -13,6 +13,7 @@ import { reverseGeocode } from '../../../lib/weather';
 import JobVariables, { PendingVariable } from '../../../components/JobVariables';
 import { Button } from '../../../components/Button';
 import { Input } from '../../../components/Input';
+import { showToast } from '../../../lib/toast';
 
 export default function NewJobScreen() {
   const router = useRouter();
@@ -60,7 +61,7 @@ export default function NewJobScreen() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission denied', 'Location access is needed for job site tracking.');
+        showToast('error', 'Location access is needed for job site tracking.');
         setLocating(false);
         return;
       }
@@ -73,7 +74,7 @@ export default function NewJobScreen() {
       if (geo.state) setState(geo.state);
       if (geo.locationName) setLocationName(geo.locationName);
     } catch {
-      Alert.alert('Error', 'Could not get location. You can enter it manually.');
+      showToast('error', 'Could not get location. You can enter it manually.');
     }
     setLocating(false);
   }
@@ -105,7 +106,7 @@ export default function NewJobScreen() {
         .select()
         .single();
       if (error || !newTask) {
-        Alert.alert('Error', 'Failed to create task type.');
+        showToast('error', 'Failed to create task type.');
         setSubmitting(false);
         return;
       }
@@ -143,7 +144,7 @@ export default function NewJobScreen() {
 
     if (error || !newJob) {
       console.error('Job create error:', error);
-      Alert.alert('Error', error?.message ?? 'Failed to create job.');
+      showToast('error', error?.message ?? 'Failed to create job.');
       setSubmitting(false);
       return;
     }
