@@ -69,17 +69,17 @@ function NewLogScreen() {
   async function fetchJob() {
     setFetchError(null);
     const [jobResult, taskResult, varResult, memberResult] = await Promise.all([
-      withRetryQuery(() =>
-        supabase.from('jobs').select('*, task_types(*), job_snapshots(*)').eq('id', jobId).single()
+      withRetryQuery(async () =>
+        await supabase.from('jobs').select('*, task_types(*), job_snapshots(*)').eq('id', jobId).single()
       ),
-      withRetryQuery(() =>
-        supabase.from('tasks').select('*').eq('job_id', jobId).neq('status', 'completed').order('sequence_order')
+      withRetryQuery(async () =>
+        await supabase.from('tasks').select('*').eq('job_id', jobId).neq('status', 'completed').order('sequence_order')
       ),
-      withRetryQuery(() =>
-        supabase.from('job_variables').select('*, job_variable_types(*)').eq('job_id', jobId).order('created_at')
+      withRetryQuery(async () =>
+        await supabase.from('job_variables').select('*, job_variable_types(*)').eq('job_id', jobId).order('created_at')
       ),
-      withRetryQuery(() =>
-        supabase.from('crew_members').select('*').eq('company_id', profile?.company_id).eq('active', true).order('name')
+      withRetryQuery(async () =>
+        await supabase.from('crew_members').select('*').eq('company_id', profile?.company_id).eq('active', true).order('name')
       ),
     ]);
 
