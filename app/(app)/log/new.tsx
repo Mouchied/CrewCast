@@ -160,7 +160,7 @@ function NewLogScreen() {
         const label = entry.taskId
           ? (tasks.find(t => t.id === entry.taskId)?.name ?? 'task')
           : 'general work';
-        errors[entry.localId] = `Missing: units completed for "${label}"`;
+        errors[entry.localId] = `Missing: items completed for "${label}"`;
       }
     }
     if (Object.keys(errors).length > 0) {
@@ -424,7 +424,7 @@ function TaskEntryCard({
     ? `${activeTask.unit.charAt(0).toUpperCase() + activeTask.unit.slice(1)} completed *`
     : job
     ? `${job.unit.charAt(0).toUpperCase() + job.unit.slice(1)} completed *`
-    : 'Units completed *';
+    : 'Items completed *';
 
   return (
     <Card style={{ gap: 10 }}>
@@ -471,7 +471,7 @@ function TaskEntryCard({
       {/* Units completed */}
       {activeTask?.total_units != null && (
         <Text style={cardStyles.hint}>
-          {activeTask.name} — {activeTask.total_units} total units for this task
+          {activeTask.name} — {activeTask.total_units} total {activeTask.unit || 'items'} for this task
         </Text>
       )}
       <Input

@@ -214,7 +214,7 @@ export default function JobDetailScreen() {
         <View style={styles.statsGrid}>
           <StatCard label={`${job.unit}/day avg`} value={snap?.avg_units_per_day?.toFixed(1) ?? '—'} sub="all time" />
           <StatCard
-            label={`${job.unit}/day avg`}
+            label={`${job.unit}/day (7d)`}
             value={snap?.last_7_day_avg?.toFixed(1) ?? '—'}
             sub="last 7 days"
             color={snap?.last_7_day_avg && snap?.avg_units_per_day && snap.last_7_day_avg > snap.avg_units_per_day ? Colors.success : undefined}
@@ -305,7 +305,7 @@ export default function JobDetailScreen() {
         <View style={{ height: 60 }} />
       </ScrollView>
 
-      <EditJobModal hook={jobEditHook} />
+      <EditJobModal hook={jobEditHook} jobUnit={job.unit} />
       <EditTaskModal hook={taskEditHook} job={job} />
       <AddTaskModal hook={taskAddHook} />
 

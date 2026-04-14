@@ -41,7 +41,7 @@ export function AddTaskModal({ hook }: Props) {
             Set the count this task is measured by — rows, combiners, feet, sets, etc.
           </Text>
           <Input value={newTaskHours} onChangeText={setNewTaskHours} placeholder="Budgeted man-hours for this task (optional)" keyboardType="numeric" />
-          <Input value={newTaskStartingUnits} onChangeText={setNewTaskStartingUnits} placeholder="Units already done before tracking (optional)" keyboardType="numeric" />
+          <Input value={newTaskStartingUnits} onChangeText={setNewTaskStartingUnits} placeholder={`${newTaskUnit || 'items'} already done before tracking (optional)`} keyboardType="numeric" />
           {!!addTaskError && <Text style={styles.error}>{addTaskError}</Text>}
           <View style={styles.btns}>
             <Button

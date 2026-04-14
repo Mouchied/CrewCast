@@ -81,7 +81,7 @@ function DashboardScreen() {
         <View style={styles.divider} />
         <View style={styles.summaryItem}>
           <Text style={styles.summaryValue}>{Math.round(totalUnits).toLocaleString()}</Text>
-          <Text style={styles.summaryLabel}>Units tracked</Text>
+          <Text style={styles.summaryLabel}>Items tracked</Text>
         </View>
       </View>
 
