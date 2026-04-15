@@ -1,23 +1,23 @@
 import { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { supabase } from '../../../lib/supabase';
-import { getPaceColor, getForecastSentence } from '../../../types';
-import { Colors } from '../../../constants/Colors';
-import JobVariables, { jobVariablesToPending } from '../../../components/JobVariables';
-import { Button } from '../../../components/Button';
-import { Card } from '../../../components/Card';
-import { showToast } from '../../../lib/toast';
-import { ConfirmDialog, ConfirmOptions } from '../../../components/ConfirmDialog';
-import { useJobData } from '../../../hooks/useJobData';
-import { useJobEdit } from '../../../hooks/useJobEdit';
-import { useTaskEdit } from '../../../hooks/useTaskEdit';
-import { useTaskAdd } from '../../../hooks/useTaskAdd';
-import { EditJobModal } from '../../../components/jobs/EditJobModal';
-import { EditTaskModal } from '../../../components/jobs/EditTaskModal';
-import { AddTaskModal } from '../../../components/jobs/AddTaskModal';
-import { TaskList } from '../../../components/jobs/TaskList';
-import { LogRow } from '../../../components/jobs/LogRow';
+import { supabase } from '../../../../lib/supabase';
+import { getPaceColor, getForecastSentence } from '../../../../types';
+import { Colors } from '../../../../constants/Colors';
+import JobVariables, { jobVariablesToPending } from '../../../../components/JobVariables';
+import { Button } from '../../../../components/Button';
+import { Card } from '../../../../components/Card';
+import { showToast } from '../../../../lib/toast';
+import { ConfirmDialog, ConfirmOptions } from '../../../../components/ConfirmDialog';
+import { useJobData } from '../../../../hooks/useJobData';
+import { useJobEdit } from '../../../../hooks/useJobEdit';
+import { useTaskEdit } from '../../../../hooks/useTaskEdit';
+import { useTaskAdd } from '../../../../hooks/useTaskAdd';
+import { EditJobModal } from '../../../../components/jobs/EditJobModal';
+import { EditTaskModal } from '../../../../components/jobs/EditTaskModal';
+import { AddTaskModal } from '../../../../components/jobs/AddTaskModal';
+import { TaskList } from '../../../../components/jobs/TaskList';
+import { LogRow } from '../../../../components/jobs/LogRow';
 
 export default function JobDetailScreen() {
   const router = useRouter();
@@ -79,8 +79,8 @@ export default function JobDetailScreen() {
     });
   }
 
-  async function toggleTaskStatus(task: import('../../../types').Task) {
-    const nextStatus: import('../../../types').Task['status'] =
+  async function toggleTaskStatus(task: import('../../../../types').Task) {
+    const nextStatus: import('../../../../types').Task['status'] =
       task.status === 'pending' ? 'active'
       : task.status === 'active' ? 'completed'
       : 'pending';
@@ -277,6 +277,7 @@ export default function JobDetailScreen() {
           onDelete={taskEditHook.deleteTask}
           onReorder={reorderTask}
           onAddTask={() => taskAddHook.setShowAddTask(true)}
+          onDrillDown={(task) => router.push(`/(app)/jobs/${id}/tasks/${task.id}`)}
         />
 
         {/* Job Variables */}
