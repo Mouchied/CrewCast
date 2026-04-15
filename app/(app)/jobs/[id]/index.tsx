@@ -212,15 +212,24 @@ export default function JobDetailScreen() {
 
         {/* Stats */}
         <View style={styles.statsGrid}>
-          <StatCard label={`${job.unit}/day avg`} value={snap?.avg_units_per_day?.toFixed(1) ?? '—'} sub="all time" />
           <StatCard
-            label={`${job.unit}/day (7d)`}
-            value={snap?.last_7_day_avg?.toFixed(1) ?? '—'}
-            sub="last 7 days"
-            color={snap?.last_7_day_avg && snap?.avg_units_per_day && snap.last_7_day_avg > snap.avg_units_per_day ? Colors.success : undefined}
+            label="Schedule"
+            value={snap?.days_ahead_behind != null
+              ? snap.days_ahead_behind >= 0
+                ? `${snap.days_ahead_behind} days ahead`
+                : `${Math.abs(snap.days_ahead_behind)} days behind`
+              : '—'}
+            color={snap?.days_ahead_behind != null
+              ? snap.days_ahead_behind >= 0 ? Colors.ahead : Colors.behind
+              : undefined}
           />
-          <StatCard label="Days logged" value={String(snap?.total_days_logged ?? 0)} sub={`of ${snap?.days_ahead_behind != null ? Math.abs(snap.days_ahead_behind) + ' diff' : '—'}`} />
-          <StatCard label="Crew size" value={String(job.crew_size ?? '—')} sub="default" />
+          <StatCard label="Hours worked" value={snap?.total_hours_worked?.toFixed(0) ?? '—'} sub="man-hours" />
+          <StatCard
+            label="Tasks"
+            value={`${tasks.filter(t => t.status === 'completed').length} / ${tasks.length}`}
+            sub="complete"
+          />
+          <StatCard label="Days logged" value={String(snap?.total_days_logged ?? 0)} sub="work days" />
         </View>
 
         {/* Earned Value */}
