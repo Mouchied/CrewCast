@@ -17,13 +17,14 @@ type Props = {
   onDelete: (task: Task) => void;
   onReorder: (from: number, to: number) => void;
   onAddTask: () => void;
+  onDrillDown?: (task: Task) => void;
 };
 
 export function TaskList({
   tasks, taskVars, taskProgress,
   dragIndex, dragOverIndex,
   onDragStart, onDragOver, onDrop, onDragEnd,
-  onToggleStatus, onEdit, onDelete, onReorder, onAddTask,
+  onToggleStatus, onEdit, onDelete, onReorder, onAddTask, onDrillDown,
 }: Props) {
   return (
     <View style={styles.section}>
@@ -55,13 +56,20 @@ export function TaskList({
                   task.status === 'active' && { backgroundColor: Colors.warning },
                 ]} />
               </TouchableOpacity>
-              <View style={{ flex: 1 }}>
-                <Text style={[
-                  styles.taskName,
-                  task.status === 'completed' && { textDecorationLine: 'line-through', color: Colors.textMuted },
-                ]}>
-                  {task.name}
-                </Text>
+              <TouchableOpacity
+                style={{ flex: 1 }}
+                activeOpacity={onDrillDown ? 0.6 : 1}
+                onPress={onDrillDown ? () => onDrillDown(task) : undefined}
+              >
+                <View style={styles.taskNameRow}>
+                  <Text style={[
+                    styles.taskName,
+                    task.status === 'completed' && { textDecorationLine: 'line-through', color: Colors.textMuted },
+                  ]}>
+                    {task.name}
+                  </Text>
+                  {onDrillDown && <Text style={styles.drillDownIcon}>›</Text>}
+                </View>
                 {task.total_units != null && task.unit ? (
                   <View style={styles.taskProgressRow}>
                     <Text style={styles.taskPct}>
@@ -93,7 +101,7 @@ export function TaskList({
                     ))}
                   </View>
                 )}
-              </View>
+              </TouchableOpacity>
               <Text style={[
                 styles.taskStatus,
                 task.status === 'completed' && { color: Colors.success },
@@ -190,7 +198,9 @@ const styles = StyleSheet.create({
     width: 12, height: 12, borderRadius: 6,
     backgroundColor: Colors.border, borderWidth: 1, borderColor: Colors.borderLight,
   },
-  taskName: { fontSize: 15, color: Colors.textPrimary, fontWeight: '600' },
+  taskNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  taskName: { fontSize: 15, color: Colors.textPrimary, fontWeight: '600', flex: 1 },
+  drillDownIcon: { fontSize: 18, color: Colors.textMuted },
   taskMeta: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
   taskStatus: { fontSize: 11, color: Colors.textMuted, fontWeight: '600', textTransform: 'uppercase' },
   taskActionBtn: { padding: 6 },
